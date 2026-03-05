@@ -2,34 +2,36 @@ from __future__ import annotations
 
 import os
 
-import requests
+import httpx
 
 from .common import ToolDef, err, now_ms, ok, parse_int
 
 
-def _searx_search(query: str, categories: str, max_results: int) -> tuple[list[dict], str]:
+async def _searx_search(query: str, categories: str, max_results: int) -> tuple[list[dict], str]:
     base_url = (os.getenv("MYTHOSAUR_TOOLS_SEARXNG_URL") or "").strip().rstrip("/")
     if not base_url:
         raise ValueError("MYTHOSAUR_TOOLS_SEARXNG_URL is not configured")
 
     token = (os.getenv("MYTHOSAUR_TOOLS_SEARXNG_TOKEN") or "").strip()
-    headers = {}
+    headers: dict[str, str] = {}
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
-    resp = requests.get(
-        f"{base_url}/search",
-        params={
-            "q": query,
-            "format": "json",
-            "categories": categories,
-            "language": "en-US",
-            "safesearch": "1",
-        },
-        headers=headers,
-        timeout=15,
-    )
-    resp.raise_for_status()
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{base_url}/search",
+            params={
+                "q": query,
+                "format": "json",
+                "categories": categories,
+                "language": "en-US",
+                "safesearch": "1",
+            },
+            headers=headers,
+            timeout=15,
+        )
+        resp.raise_for_status()
+
     payload = resp.json()
     results = payload.get("results") or []
     clipped = []
@@ -45,26 +47,26 @@ def _searx_search(query: str, categories: str, max_results: int) -> tuple[list[d
     return clipped, base_url
 
 
-def _search(arguments: dict) -> dict:
-    return _run_search("search", arguments, "general")
+async def _search(arguments: dict) -> dict:
+    return await _run_search("search", arguments, "general")
 
 
-def _search_news(arguments: dict) -> dict:
-    return _run_search("search_news", arguments, "news")
+async def _search_news(arguments: dict) -> dict:
+    return await _run_search("search_news", arguments, "news")
 
 
-def _search_images(arguments: dict) -> dict:
-    return _run_search("search_images", arguments, "images")
+async def _search_images(arguments: dict) -> dict:
+    return await _run_search("search_images", arguments, "images")
 
 
-def _run_search(tool_name: str, arguments: dict, categories: str) -> dict:
+async def _run_search(tool_name: str, arguments: dict, categories: str) -> dict:
     started = now_ms()
     query = (arguments.get("query") or "").strip()
     if not query:
         return err(tool_name, "missing_query", "query is required", "search", started)
     max_results = parse_int(arguments.get("max_results"), default=5, minimum=1, maximum=10)
     try:
-        results, source = _searx_search(query, categories, max_results)
+        results, source = await _searx_search(query, categories, max_results)
     except Exception as exc:
         return err(tool_name, "search_failed", str(exc), "search", started)
 
@@ -100,6 +102,7 @@ def get_tools() -> list[ToolDef]:
             input_schema=base_schema,
             handler=_search,
             aliases=["osaurus.search"],
+            is_async=True,
         ),
         ToolDef(
             name="search_news",
@@ -108,6 +111,7 @@ def get_tools() -> list[ToolDef]:
             input_schema=base_schema,
             handler=_search_news,
             aliases=["osaurus.search_news"],
+            is_async=True,
         ),
         ToolDef(
             name="search_images",
@@ -116,5 +120,6 @@ def get_tools() -> list[ToolDef]:
             input_schema=base_schema,
             handler=_search_images,
             aliases=["osaurus.search_images"],
+            is_async=True,
         ),
     ]

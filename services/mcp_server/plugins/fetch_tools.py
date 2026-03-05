@@ -1,12 +1,24 @@
 from __future__ import annotations
 
-import os
-from pathlib import Path
+import json
 
-import requests
+import httpx
 from bs4 import BeautifulSoup
 
 from .common import ToolDef, err, now_ms, ok, parse_int, resolve_under_workspace
+
+
+async def _fetch_core(
+    url: str, headers: dict[str, str], timeout: int, max_bytes: int
+) -> tuple[int, dict[str, str], bytes, str]:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        async with client.stream("GET", url, headers=headers, timeout=timeout) as resp:
+            content = bytearray()
+            async for chunk in resp.aiter_bytes(chunk_size=8192):
+                content.extend(chunk)
+                if len(content) > max_bytes:
+                    raise ValueError(f"response exceeds max_bytes={max_bytes}")
+            return resp.status_code, dict(resp.headers), bytes(content), str(resp.url)
 
 
 def _safe_headers(raw: dict) -> dict[str, str]:
@@ -22,19 +34,7 @@ def _safe_headers(raw: dict) -> dict[str, str]:
     return out
 
 
-def _fetch_core(url: str, headers: dict, timeout: int, max_bytes: int) -> tuple[int, dict, bytes, str]:
-    with requests.get(url, headers=headers, timeout=timeout, stream=True) as resp:
-        content = bytearray()
-        for chunk in resp.iter_content(chunk_size=8192):
-            if not chunk:
-                continue
-            content.extend(chunk)
-            if len(content) > max_bytes:
-                raise ValueError(f"response exceeds max_bytes={max_bytes}")
-        return resp.status_code, dict(resp.headers), bytes(content), resp.url
-
-
-def _fetch(arguments: dict) -> dict:
+async def _fetch(arguments: dict) -> dict:
     started = now_ms()
     url = (arguments.get("url") or "").strip()
     if not url:
@@ -44,7 +44,7 @@ def _fetch(arguments: dict) -> dict:
     headers = _safe_headers(arguments.get("headers") or {})
 
     try:
-        status, resp_headers, raw, final_url = _fetch_core(url, headers, timeout, max_bytes)
+        status, resp_headers, raw, final_url = await _fetch_core(url, headers, timeout, max_bytes)
         text = raw.decode("utf-8", errors="replace")
     except Exception as exc:
         return err("fetch", "fetch_failed", str(exc), "fetch", started)
@@ -62,7 +62,7 @@ def _fetch(arguments: dict) -> dict:
     )
 
 
-def _fetch_json(arguments: dict) -> dict:
+async def _fetch_json(arguments: dict) -> dict:
     started = now_ms()
     url = (arguments.get("url") or "").strip()
     if not url:
@@ -72,8 +72,8 @@ def _fetch_json(arguments: dict) -> dict:
     headers = _safe_headers(arguments.get("headers") or {})
 
     try:
-        status, resp_headers, raw, final_url = _fetch_core(url, headers, timeout, max_bytes)
-        payload = requests.models.complexjson.loads(raw.decode("utf-8", errors="replace"))
+        status, resp_headers, raw, final_url = await _fetch_core(url, headers, timeout, max_bytes)
+        payload = json.loads(raw.decode("utf-8", errors="replace"))
     except Exception as exc:
         return err("fetch_json", "fetch_failed", str(exc), "fetch", started)
 
@@ -90,7 +90,7 @@ def _fetch_json(arguments: dict) -> dict:
     )
 
 
-def _fetch_html(arguments: dict) -> dict:
+async def _fetch_html(arguments: dict) -> dict:
     started = now_ms()
     url = (arguments.get("url") or "").strip()
     if not url:
@@ -101,7 +101,7 @@ def _fetch_html(arguments: dict) -> dict:
     headers = _safe_headers(arguments.get("headers") or {})
 
     try:
-        status, resp_headers, raw, final_url = _fetch_core(url, headers, timeout, max_bytes)
+        status, resp_headers, raw, final_url = await _fetch_core(url, headers, timeout, max_bytes)
         html = raw.decode("utf-8", errors="replace")
         soup = BeautifulSoup(html, "html.parser")
         if selector:
@@ -126,7 +126,7 @@ def _fetch_html(arguments: dict) -> dict:
     )
 
 
-def _download(arguments: dict) -> dict:
+async def _download(arguments: dict) -> dict:
     started = now_ms()
     url = (arguments.get("url") or "").strip()
     path = (arguments.get("path") or "").strip()
@@ -148,7 +148,7 @@ def _download(arguments: dict) -> dict:
     headers = _safe_headers(arguments.get("headers") or {})
 
     try:
-        status, resp_headers, raw, final_url = _fetch_core(url, headers, timeout, max_bytes)
+        status, resp_headers, raw, final_url = await _fetch_core(url, headers, timeout, max_bytes)
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(raw)
     except Exception as exc:
@@ -189,6 +189,7 @@ def get_tools() -> list[ToolDef]:
             },
             handler=_fetch,
             aliases=["osaurus.fetch"],
+            is_async=True,
         ),
         ToolDef(
             name="fetch_json",
@@ -202,6 +203,7 @@ def get_tools() -> list[ToolDef]:
             },
             handler=_fetch_json,
             aliases=["osaurus.fetch_json"],
+            is_async=True,
         ),
         ToolDef(
             name="fetch_html",
@@ -218,6 +220,7 @@ def get_tools() -> list[ToolDef]:
             },
             handler=_fetch_html,
             aliases=["osaurus.fetch_html"],
+            is_async=True,
         ),
         ToolDef(
             name="download",
@@ -235,5 +238,6 @@ def get_tools() -> list[ToolDef]:
             },
             handler=_download,
             aliases=["osaurus.download"],
+            is_async=True,
         ),
     ]

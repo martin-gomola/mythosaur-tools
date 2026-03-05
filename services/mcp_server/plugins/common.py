@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Coroutine, Union
+
+SyncHandler = Callable[[dict[str, Any]], dict[str, Any]]
+AsyncHandler = Callable[[dict[str, Any]], Coroutine[Any, Any, dict[str, Any]]]
 
 
 @dataclass
@@ -13,8 +17,14 @@ class ToolDef:
     plugin_id: str
     description: str
     input_schema: dict[str, Any]
-    handler: Callable[[dict[str, Any]], dict[str, Any]]
+    handler: Union[SyncHandler, AsyncHandler]
     aliases: list[str] | None = None
+    is_async: bool = False
+
+    async def invoke(self, args: dict[str, Any]) -> dict[str, Any]:
+        if self.is_async:
+            return await self.handler(args)
+        return await asyncio.to_thread(self.handler, args)
 
 
 def now_ms() -> int:
