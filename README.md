@@ -18,6 +18,7 @@ Shared skill source-of-truth lives here:
 
 - `skills/shared/context7`
 - `skills/shared/agent-browser`
+- `skills/shared/tool-intent-router`
 
 OpenClaw consumer mount in `mythosaur-ai`:
 

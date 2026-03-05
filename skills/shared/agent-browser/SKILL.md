@@ -1,14 +1,10 @@
 ---
 name: agent-browser
 description: >
-  Browser automation CLI for AI agents. Use when the user needs to interact
-  with websites: navigate pages, fill forms, click buttons, take screenshots,
-  extract data, discover selectors, test web apps, or automate any browser
-  task. Triggers include "open a URL", "fill out a form", "click a button",
-  "take a screenshot", "scrape data from a page", "test this web app",
-  "log in to a site", or any task requiring programmatic web interaction.
+  Browser automation for web interaction tasks (navigation, forms, clicks,
+  screenshots, scraping, and UI testing).
 allowed-tools: Bash(agent-browser:*), Bash($HOME/.openclaw/skills/agent-browser/scripts/agent-browser.sh:*)
-metadata: {"openclaw":{"requires":{"bins":["agent-browser"]},"always":true}}
+metadata: {"openclaw":{"requires":{"bins":["agent-browser"]}}}
 ---
 
 # Agent Browser

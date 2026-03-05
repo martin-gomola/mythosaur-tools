@@ -1,14 +1,10 @@
 ---
 name: context7
 description: >
-  Retrieve up-to-date library and framework documentation via Context7 MCP.
-  Use when the user needs current official docs, API references, or code
-  examples for any programming library or framework. Triggers include
-  "look up the docs for X", "how does Y work in the latest version",
-  "find examples for Z", "what's the API for W", or any request where
-  answers depend on current documentation rather than training data.
+  Retrieve current library/framework documentation and API examples via
+  Context7 MCP when accuracy depends on latest docs.
 allowed-tools: Bash(curl:*)
-metadata: {"openclaw":{"requires":{"bins":[]},"always":true}}
+metadata: {"openclaw":{"requires":{"bins":[]}}}
 ---
 
 # Context7
