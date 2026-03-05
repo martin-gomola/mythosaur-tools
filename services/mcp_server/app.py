@@ -20,7 +20,6 @@ MCP_PROTOCOL_VERSION = "2024-11-05"
 app = FastAPI(title="mythosaur-tools", version=API_VERSION)
 TOOLS, PLUGINS_META = load_tools()
 SESSIONS: dict[str, dict[str, Any]] = {}
-
 _RATE_WINDOW_SEC = 60
 _RATE_MAX_CALLS = int(os.getenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "120"))
 _rate_ledger: dict[str, list[float]] = collections.defaultdict(list)

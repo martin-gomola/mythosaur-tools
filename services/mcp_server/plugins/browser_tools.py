@@ -81,6 +81,8 @@ def _navigate(args: dict) -> dict:
     url = (args.get("url") or "").strip()
     if not url:
         return err("browser_navigate", "missing_url", "url is required", "browser", started)
+    if "://" not in url:
+        url = f"https://{url}"
     wait_until = (args.get("wait_until") or "domcontentloaded").strip()
     try:
         sess = BROWSER.get(args.get("session_id"), create=True)

@@ -19,5 +19,5 @@ services:
     ports:
       - "${MYTHOSAUR_TOOLS_MCP_PORT:-8080}:8080"
     volumes:
-      - ${MYTHOSAUR_TOOLS_WORKSPACE_ROOT:-/workspace}:${MYTHOSAUR_TOOLS_WORKSPACE_ROOT:-/workspace}
+      - ${MYTHOSAUR_TOOLS_WORKSPACE_HOST:-../mythosaur-ai}:${MYTHOSAUR_TOOLS_WORKSPACE_ROOT:-/workspace}
     restart: unless-stopped

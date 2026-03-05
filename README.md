@@ -50,6 +50,7 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 ## Security Defaults
 
 - Workspace guard: file paths must resolve under `MYTHOSAUR_TOOLS_WORKSPACE_ROOT`
+- Host mount path is configured separately via `MYTHOSAUR_TOOLS_WORKSPACE_HOST`
 - Profile guard:
   - `readonly` blocks mutating filesystem tools
   - `power` enables mutating filesystem tools
@@ -60,6 +61,8 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 ```bash
 cp .env.example .env
 # set a strong token in MYTHOSAUR_TOOLS_API_KEY
+# point host workspace mount to the repo you want tools to access
+# MYTHOSAUR_TOOLS_WORKSPACE_HOST=../mythosaur-ai
 # if mythosaur-ai searxng is on same host, keep default:
 # MYTHOSAUR_TOOLS_SEARXNG_URL=http://host.docker.internal:8090
 
