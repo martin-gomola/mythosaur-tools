@@ -1,0 +1,23 @@
+name: mythosaur-tools
+
+services:
+  mythosaur-tools:
+    build:
+      context: ./services/mcp_server
+    container_name: mythosaur-tools
+    env_file:
+      - .env
+    environment:
+      MYTHOSAUR_TOOLS_API_KEY: ${MYTHOSAUR_TOOLS_API_KEY}
+      MYTHOSAUR_TOOLS_PROFILE: ${MYTHOSAUR_TOOLS_PROFILE:-readonly}
+      MYTHOSAUR_TOOLS_WORKSPACE_ROOT: ${MYTHOSAUR_TOOLS_WORKSPACE_ROOT:-/workspace}
+      MYTHOSAUR_TOOLS_SEARXNG_URL: ${MYTHOSAUR_TOOLS_SEARXNG_URL:-}
+      MYTHOSAUR_TOOLS_SEARXNG_TOKEN: ${MYTHOSAUR_TOOLS_SEARXNG_TOKEN:-}
+      MYTHOSAUR_TOOLS_BROWSER_ENABLED: ${MYTHOSAUR_TOOLS_BROWSER_ENABLED:-false}
+      MYTHOSAUR_TOOLS_BROWSER_HEADLESS: ${MYTHOSAUR_TOOLS_BROWSER_HEADLESS:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "${MYTHOSAUR_TOOLS_MCP_PORT:-8080}:8080"
+    volumes:
+      - ${MYTHOSAUR_TOOLS_WORKSPACE_ROOT:-/workspace}:${MYTHOSAUR_TOOLS_WORKSPACE_ROOT:-/workspace}
+    restart: unless-stopped
