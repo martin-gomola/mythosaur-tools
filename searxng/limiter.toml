@@ -1,0 +1,2 @@
+# Minimal limiter config to avoid startup warning when SearXNG loads botdetection config.
+# Limiter remains effectively disabled by server.limiter=false in settings.yml.

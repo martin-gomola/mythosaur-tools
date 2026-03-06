@@ -51,6 +51,10 @@ class BrowserManager:
         sid = (session_id or "").strip()
         if sid and sid in self.sessions:
             return self.sessions[sid]
+        if not sid and self.sessions:
+            # Default flow without explicit session_id reuses an existing session.
+            # This avoids repeatedly starting Playwright sync runtime per command.
+            return next(iter(self.sessions.values()))
         if not create:
             raise KeyError(f"unknown browser session: {sid}")
         return self._create(session_id=sid or None)

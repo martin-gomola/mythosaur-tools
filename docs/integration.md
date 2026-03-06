@@ -5,17 +5,18 @@
 ```bash
 cp .env.example .env
 # set MYTHOSAUR_TOOLS_API_KEY
-# For search/news/images set MYTHOSAUR_TOOLS_SEARXNG_URL to reachable SearXNG endpoint
+# Default internal search endpoint is bundled in this stack: http://searxng-cache:8080
 
 docker compose up -d --build
-curl -s http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8080}/healthz | jq
+curl -s http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}/healthz | jq
+curl -s "http://127.0.0.1:${MYTHOSAUR_TOOLS_SEARXNG_PORT:-8063}/search?q=healthcheck&format=json" | jq '.results | length'
 ```
 
 ## MCP Test
 
 ```bash
 API_KEY="${MYTHOSAUR_TOOLS_API_KEY}"
-MCP_URL="http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8080}/mcp"
+MCP_URL="http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}/mcp"
 
 curl -sS -X POST "$MCP_URL" \
   -H "Authorization: Bearer $API_KEY" \
@@ -217,10 +218,11 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `MYTHOSAUR_TOOLS_API_KEY` | Yes | — | Bearer token for MCP auth |
-| `MYTHOSAUR_TOOLS_MCP_PORT` | No | `8080` | HTTP listen port |
+| `MYTHOSAUR_TOOLS_MCP_PORT` | No | `8064` | HTTP listen port |
 | `MYTHOSAUR_TOOLS_PROFILE` | No | `readonly` | `readonly` or `power` (controls mutating FS tools) |
 | `MYTHOSAUR_TOOLS_WORKSPACE_ROOT` | No | `/workspace` | Root for filesystem/git tools |
-| `MYTHOSAUR_TOOLS_SEARXNG_URL` | No | — | SearXNG endpoint for search tools |
+| `MYTHOSAUR_TOOLS_SEARXNG_PORT` | No | `8063` | Host port for bundled `searxng-cache` |
+| `MYTHOSAUR_TOOLS_SEARXNG_URL` | No | `http://searxng-cache:8080` | SearXNG endpoint for search tools |
 | `MYTHOSAUR_TOOLS_SEARXNG_TOKEN` | No | — | Optional SearXNG auth token |
 | `MYTHOSAUR_TOOLS_BROWSER_ENABLED` | No | `false` | Enable browser tools |
 | `MYTHOSAUR_TOOLS_BROWSER_HEADLESS` | No | `true` | Run browser headless |

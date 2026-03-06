@@ -8,6 +8,7 @@ This repository keeps tool backends and managed skill sources separate from `myt
 
 - MCP HTTP endpoint: `/mcp`
 - Health endpoint: `/healthz`
+- Bundled SearXNG + micro-cache (`searxng`, `searxng-cache`) for search tools
 - Static bearer auth via `Authorization: Bearer <MYTHOSAUR_TOOLS_API_KEY>`
 - Plugin catalog (canonical namespace: `mythosaur.*`, with `osaurus.*` aliases)
 - Central source for shared agent skills (`skills/shared/*`)
@@ -63,18 +64,20 @@ cp .env.example .env
 # set a strong token in MYTHOSAUR_TOOLS_API_KEY
 # point host workspace mount to the repo you want tools to access
 # MYTHOSAUR_TOOLS_WORKSPACE_HOST=../mythosaur-ai
-# if mythosaur-ai searxng is on same host, keep default:
-# MYTHOSAUR_TOOLS_SEARXNG_URL=http://host.docker.internal:8090
+# Default port sequence:
+# 8063 = mythosaur-tools searxng-cache
+# 8064 = mythosaur-tools MCP
+# 8065 = Mattermost
 
 docker compose up -d --build
-curl -s http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8080}/healthz | jq
+curl -s http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}/healthz | jq
 ```
 
 ## MCP Smoke Test
 
 ```bash
 API_KEY="$(awk -F= '/^MYTHOSAUR_TOOLS_API_KEY=/{print substr($0,index($0,"=")+1)}' .env | tail -n1)"
-MCP_URL="http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8080}/mcp"
+MCP_URL="http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}/mcp"
 
 curl -sS -X POST "$MCP_URL" \
   -H "Authorization: Bearer $API_KEY" \

@@ -1,0 +1,39 @@
+use_default_settings: true
+
+general:
+  instance_name: "Mythosaur Tools SearXNG"
+
+search:
+  formats:
+    - html
+    - json
+  ban_time_on_fail: 30
+  max_ban_time_on_fail: 86400
+  suspended_times:
+    SearxEngineAccessDenied: 3600
+    SearxEngineCaptcha: 604800
+    SearxEngineTooManyRequests: 900
+    cf_SearxEngineCaptcha: 1209600
+    cf_SearxEngineAccessDenied: 172800
+
+server:
+  secret_key: "mythosaur-tools-searxng-local-key-change-me"
+  limiter: false
+
+outgoing:
+  request_timeout: 2.6
+  max_request_timeout: 6.0
+  pool_connections: 40
+  pool_maxsize: 10
+  keepalive_expiry: 45.0
+  enable_http2: true
+
+engines:
+  - name: ahmia
+    disabled: true
+  - name: torch
+    disabled: true
+  - name: duckduckgo
+    disabled: true
+  - name: startpage
+    disabled: true
