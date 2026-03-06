@@ -21,10 +21,10 @@ Shared skill source-of-truth lives here:
 - `skills/shared/agent-browser`
 - `skills/shared/tool-intent-router`
 
-OpenClaw consumer mount in `mythosaur-ai`:
+Skill export path used by local agent environments:
 
 ```bash
-${MYTHOSAUR_TOOLS_SKILLS_DIR:-../mythosaur-tools/skills/shared} -> /opt/openclaw-templates/skills
+${MYTHOSAUR_TOOLS_SKILLS_DIR:-../mythosaur-tools/skills/shared}
 ```
 
 Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other runtimes):
@@ -47,15 +47,18 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 | `mythosaur.fetch` | `fetch`, `fetch_json`, `fetch_html`, `download` |
 | `mythosaur.search` | `search`, `search_news`, `search_images` |
 | `mythosaur.filesystem` | `read_file`, `write_file`, `list_directory`, `create_directory`, `delete_file`, `move_file`, `search_files`, `get_file_info` |
+| `mythosaur.google_workspace` | `google_calendar_events`, `gmail_unread`, `google_drive_recent_files`, `google_sheets_read_range` |
 
 ## Security Defaults
 
 - Workspace guard: file paths must resolve under `MYTHOSAUR_TOOLS_WORKSPACE_ROOT`
+- Base-dir helpers reject NUL bytes and directory escape attempts
 - Host mount path is configured separately via `MYTHOSAUR_TOOLS_WORKSPACE_HOST`
 - Profile guard:
   - `readonly` blocks mutating filesystem tools
   - `power` enables mutating filesystem tools
 - Browser tools are disabled by default (`MYTHOSAUR_TOOLS_BROWSER_ENABLED=false`)
+- Google Workspace tools require OAuth token and credentials files mounted into `./data`
 
 ## Quick Start
 
@@ -64,6 +67,7 @@ cp .env.example .env
 # set a strong token in MYTHOSAUR_TOOLS_API_KEY
 # point host workspace mount to the repo you want tools to access
 # MYTHOSAUR_TOOLS_WORKSPACE_HOST=../mythosaur-ai
+# mount Google OAuth files into ./data if you want Google Workspace tools
 # Default port sequence:
 # 8063 = mythosaur-tools searxng-cache
 # 8064 = mythosaur-tools MCP
@@ -94,4 +98,23 @@ curl -sS -X POST "$MCP_URL" \
 
 - `mythosaur-ai` consumes these tools via `MYTHOSAUR_TOOLS_MCP_URL` and `MYTHOSAUR_TOOLS_API_KEY`
 - Grogu uses explicit command-driven tool calls (non-agentic)
-- Mythosaur/OpenClaw can call the same MCP backend through wrapper tools
+- Nanoclaw can call the same MCP backend for Grogu and Mythosaur roles
+
+## Google Workspace Setup
+
+Provide OAuth files in the local `data/` directory used by Docker compose:
+
+- `data/google-credentials.json`
+- `data/google-token.json`
+
+Env vars:
+
+- `MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE=/data/google-credentials.json`
+- `MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE=/data/google-token.json`
+
+Current Google MCP tools:
+
+- `google_calendar_events`
+- `gmail_unread`
+- `google_drive_recent_files`
+- `google_sheets_read_range`

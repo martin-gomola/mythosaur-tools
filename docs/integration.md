@@ -226,8 +226,33 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 | `MYTHOSAUR_TOOLS_SEARXNG_TOKEN` | No | — | Optional SearXNG auth token |
 | `MYTHOSAUR_TOOLS_BROWSER_ENABLED` | No | `false` | Enable browser tools |
 | `MYTHOSAUR_TOOLS_BROWSER_HEADLESS` | No | `true` | Run browser headless |
+| `MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE` | No | `/data/google-credentials.json` | Google OAuth client credentials file |
+| `MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE` | No | `/data/google-token.json` | Google OAuth authorized user token file |
 | `MYTHOSAUR_TOOLS_RATE_LIMIT` | No | `120` | Max tool calls per 60s window (0 = disabled) |
 | `LOG_LEVEL` | No | `INFO` | Python log level |
+
+---
+
+## Google Workspace Tools
+
+Available tools:
+
+- `google_calendar_events`
+- `gmail_unread`
+- `google_drive_recent_files`
+- `google_sheets_read_range`
+
+Expected local files for Docker compose:
+
+- `./data/google-credentials.json`
+- `./data/google-token.json`
+
+The MCP container mounts `./data` to `/data`, and the Google tools read credentials from:
+
+- `/data/google-credentials.json`
+- `/data/google-token.json`
+
+If the token is missing, expired, or not authorized for the requested scopes, the tool returns a structured MCP error.
 
 ---
 
@@ -241,6 +266,8 @@ def get_tools() -> list[ToolDef]:
 ```
 
 Adding a new plugin requires only creating a new `*_tools.py` file — no registration code changes needed.
+
+Path safety helpers in `plugins/common.py` support both workspace-root and arbitrary base-dir constrained resolution. Use those helpers instead of building file paths manually.
 
 ### Async Support
 

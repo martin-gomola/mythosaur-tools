@@ -79,6 +79,8 @@ def resolve_under_workspace(path_value: str) -> Path:
     value = (path_value or "").strip()
     if not value:
         raise ValueError("path is required")
+    if "\x00" in value:
+        raise ValueError("path contains NUL byte")
 
     candidate = Path(value)
     if not candidate.is_absolute():
@@ -92,6 +94,29 @@ def resolve_under_workspace(path_value: str) -> Path:
         resolved.relative_to(root)
     except ValueError as exc:
         raise ValueError(f"path escapes workspace root: {path_value}") from exc
+    return resolved
+
+
+def resolve_under_base(path_value: str, base_dir: str | Path) -> Path:
+    base = Path(base_dir).resolve()
+    value = (path_value or "").strip()
+    if not value:
+        raise ValueError("path is required")
+    if "\x00" in value:
+        raise ValueError("path contains NUL byte")
+
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = base / candidate
+
+    resolved = candidate.resolve(strict=False)
+    if resolved == base:
+        return resolved
+
+    try:
+        resolved.relative_to(base)
+    except ValueError as exc:
+        raise ValueError(f"path escapes base dir: {path_value}") from exc
     return resolved
 
 

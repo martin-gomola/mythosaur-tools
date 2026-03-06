@@ -15,6 +15,8 @@ services:
       MYTHOSAUR_TOOLS_SEARXNG_TOKEN: ${MYTHOSAUR_TOOLS_SEARXNG_TOKEN:-}
       MYTHOSAUR_TOOLS_BROWSER_ENABLED: ${MYTHOSAUR_TOOLS_BROWSER_ENABLED:-false}
       MYTHOSAUR_TOOLS_BROWSER_HEADLESS: ${MYTHOSAUR_TOOLS_BROWSER_HEADLESS:-true}
+      MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE: ${MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE:-/data/google-credentials.json}
+      MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE: ${MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE:-/data/google-token.json}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       searxng-cache:
@@ -23,6 +25,7 @@ services:
       - "127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}:8080"
     volumes:
       - ${MYTHOSAUR_TOOLS_WORKSPACE_HOST:-../mythosaur-ai}:${MYTHOSAUR_TOOLS_WORKSPACE_ROOT:-/workspace}
+      - ./data:/data
     restart: unless-stopped
 
   searxng:
