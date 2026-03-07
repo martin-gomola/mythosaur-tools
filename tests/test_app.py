@@ -113,6 +113,7 @@ class TestMcpToolsList:
         assert len(tools) > 0
         names = {t["name"] for t in tools}
         assert "current_time" in names
+        assert "scan_pii_staged" in names
 
     def test_filter_by_plugin(self, client):
         resp = client.post(

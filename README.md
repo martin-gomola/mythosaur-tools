@@ -20,6 +20,7 @@ Shared skill source-of-truth lives here:
 - `skills/shared/context7`
 - `skills/shared/agent-browser`
 - `skills/shared/tool-intent-router`
+- `skills/shared/pii-precommit-check`
 
 Skill export path used by local agent environments:
 
@@ -48,10 +49,12 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 | `mythosaur.search` | `search`, `search_news`, `search_images` |
 | `mythosaur.filesystem` | `read_file`, `write_file`, `list_directory`, `create_directory`, `delete_file`, `move_file`, `search_files`, `get_file_info` |
 | `mythosaur.google_workspace` | `google_calendar_events`, `gmail_unread`, `google_drive_recent_files`, `google_sheets_read_range` |
+| `mythosaur.pii` | `scan_pii_staged`, `scan_pii_repo`, `install_pii_precommit_hook` |
 
 ## Security Defaults
 
 - Workspace guard: file paths must resolve under `MYTHOSAUR_TOOLS_WORKSPACE_ROOT`
+- PII guard: repo scan paths must resolve under `MYTHOSAUR_TOOLS_PII_ROOT` (defaults to the workspace root)
 - Base-dir helpers reject NUL bytes and directory escape attempts
 - Host mount path is configured separately via `MYTHOSAUR_TOOLS_WORKSPACE_HOST`
 - Profile guard:
@@ -99,6 +102,7 @@ curl -sS -X POST "$MCP_URL" \
 - `mythosaur-ai` consumes these tools via `MYTHOSAUR_TOOLS_MCP_URL` and `MYTHOSAUR_TOOLS_API_KEY`
 - Grogu uses explicit command-driven tool calls (non-agentic)
 - Nanoclaw can call the same MCP backend for Grogu and Mythosaur roles
+- Shared clients can export `pii-precommit-check` from `skills/shared/` and reuse the same PII MCP tools instead of duplicating scan logic in prompts
 
 ## Google Workspace Setup
 

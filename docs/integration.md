@@ -221,6 +221,8 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 | `MYTHOSAUR_TOOLS_MCP_PORT` | No | `8064` | HTTP listen port |
 | `MYTHOSAUR_TOOLS_PROFILE` | No | `readonly` | `readonly` or `power` (controls mutating FS tools) |
 | `MYTHOSAUR_TOOLS_WORKSPACE_ROOT` | No | `/workspace` | Root for filesystem/git tools |
+| `MYTHOSAUR_TOOLS_PII_ROOT` | No | `MYTHOSAUR_TOOLS_WORKSPACE_ROOT` | Base dir for PII repo scans and hook installs |
+| `MYTHOSAUR_TOOLS_PII_SCRIPT_PATH` | No | `scripts/pii_scan.py` in repo root | Local CLI script used by installed pre-commit hooks |
 | `MYTHOSAUR_TOOLS_SEARXNG_PORT` | No | `8063` | Host port for bundled `searxng-cache` |
 | `MYTHOSAUR_TOOLS_SEARXNG_URL` | No | `http://searxng-cache:8080` | SearXNG endpoint for search tools |
 | `MYTHOSAUR_TOOLS_SEARXNG_TOKEN` | No | — | Optional SearXNG auth token |
@@ -253,6 +255,28 @@ The MCP container mounts `./data` to `/data`, and the Google tools read credenti
 - `/data/google-token.json`
 
 If the token is missing, expired, or not authorized for the requested scopes, the tool returns a structured MCP error.
+
+---
+
+## PII Tools
+
+Available tools:
+
+- `scan_pii_staged`
+- `scan_pii_repo`
+- `install_pii_precommit_hook`
+
+Recommended usage pattern:
+
+1. call `scan_pii_staged` before commit
+2. block commit progress if findings exist
+3. call `scan_pii_repo` for wider audits
+4. call `install_pii_precommit_hook` when the user wants local automation
+
+Design note:
+
+- the shared MCP tools own scanning and hook installation
+- a thin client skill should only decide when to trigger, which tool to call, and how to react to findings
 
 ---
 

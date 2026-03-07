@@ -19,6 +19,8 @@ def test_all_plugins_discovered():
         "mythosaur.fetch",
         "mythosaur.filesystem",
         "mythosaur.browser",
+        "mythosaur.google_workspace",
+        "mythosaur.pii",
     }
     assert expected == plugin_ids
 
