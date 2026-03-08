@@ -29,6 +29,8 @@ Use this skill for requests backed by the Google and NotebookLM tools in `mythos
 - Sheets tab creation -> `google_sheets_create_sheet`
 - Maps route links -> `google_maps_build_route_link`
 - Maps place links -> `google_maps_build_place_link`
+- Maps place search -> `google_maps_search_places`
+- Maps route compute -> `google_maps_compute_route`
 - NotebookLM auth check -> `notebooklm_auth_status`
 - NotebookLM notebook discovery -> `notebooklm_list_notebooks`
 - NotebookLM grounded Q&A -> `notebooklm_query_notebook`
@@ -48,6 +50,8 @@ Use this skill for requests backed by the Google and NotebookLM tools in `mythos
    - writing or appending sheet data
    - creating a sheet tab
    - generating a Google Maps route or place link
+   - searching for places on a route
+   - computing route distance and duration
    - their notes, research, notebooks, or NotebookLM content
 2. For NotebookLM:
    - use `notebooklm_list_notebooks` first if the notebook is not clearly identified

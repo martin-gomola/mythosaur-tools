@@ -9,7 +9,7 @@ Keep each system responsible for one thing:
 - Google Drive stores files.
 - Google Docs stores collaborative narrative documents.
 - Google Sheets stores indexes, registries, and lightweight structured rows.
-- Google Maps stores route links only.
+- Google Maps stores route links and optional API-backed route or place lookups.
 - NotebookLM stores research and document-grounded knowledge.
 - Workspace files store active project state, tasks, and decisions.
 
@@ -33,11 +33,13 @@ Available today in `mythosaur-tools`:
 - `google_docs_create`
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
+- `google_maps_search_places`
+- `google_maps_compute_route`
 - `notebooklm_auth_status`
 - `notebooklm_list_notebooks`
 - `notebooklm_query_notebook`
 
-These now cover the first clean write layer for Gmail, Drive, Sheets, and Docs, plus direct text-file creation in Drive and the Phase 3 Google Maps link builders. NotebookLM creation flows are still pending.
+These now cover the first clean write layer for Gmail, Drive, Sheets, and Docs, plus direct text-file creation in Drive and both Google Maps link builders and API-backed itinerary primitives. NotebookLM creation flows are still pending.
 
 ## Runtime Capability Flags
 
@@ -122,14 +124,17 @@ Add small MCP tools, not one large "Google workflow" tool.
 
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
+- `google_maps_search_places`
+- `google_maps_compute_route`
 
-These should generate stable links first. Route persistence belongs in Sheets, not in the Maps layer.
+These should keep generating stable links first. When a Maps API key is configured, Places and Routes can also be queried directly for itinerary building. Route persistence still belongs in Sheets, not in the Maps layer.
 
-Optional future-facing config:
+Maps config:
 
+- `GOOGLE_MAPS_API_KEY`
 - `GOOGLE_MAPS_PLATFORM`
 
-This can be reserved for richer API-backed itinerary features later, but the current Maps tools only generate links and do not require Google Maps Platform API calls.
+`GOOGLE_MAPS_API_KEY` enables the live Places and Routes tools. `GOOGLE_MAPS_PLATFORM` can still be reserved for project/platform metadata or future policy.
 
 ### NotebookLM
 

@@ -49,7 +49,7 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 | `mythosaur.fetch` | `fetch`, `fetch_json`, `fetch_html`, `download` |
 | `mythosaur.search` | `search`, `search_news`, `search_images` |
 | `mythosaur.filesystem` | `read_file`, `write_file`, `list_directory`, `create_directory`, `delete_file`, `move_file`, `search_files`, `get_file_info` |
-| `mythosaur.google_workspace` | `google_calendar_events`, `google_calendar_create_event`, `gmail_unread`, `gmail_send`, `google_drive_recent_files`, `google_drive_create_folder`, `google_drive_create_text_file`, `google_drive_upload_file`, `google_sheets_read_range`, `google_sheets_write_range`, `google_sheets_append_rows`, `google_sheets_create_sheet`, `google_docs_get`, `google_docs_create`, `google_maps_build_route_link`, `google_maps_build_place_link`, `notebooklm_auth_status`, `notebooklm_list_notebooks`, `notebooklm_query_notebook` |
+| `mythosaur.google_workspace` | `google_calendar_events`, `google_calendar_create_event`, `gmail_unread`, `gmail_send`, `google_drive_recent_files`, `google_drive_create_folder`, `google_drive_create_text_file`, `google_drive_upload_file`, `google_sheets_read_range`, `google_sheets_write_range`, `google_sheets_append_rows`, `google_sheets_create_sheet`, `google_docs_get`, `google_docs_create`, `google_maps_build_route_link`, `google_maps_build_place_link`, `google_maps_search_places`, `google_maps_compute_route`, `notebooklm_auth_status`, `notebooklm_list_notebooks`, `notebooklm_query_notebook` |
 | `mythosaur.pii` | `scan_pii_staged`, `scan_pii_repo`, `install_pii_precommit_hook` |
 
 ## Security Defaults
@@ -126,6 +126,8 @@ Minimal setup:
    - Google Drive API
    - Google Sheets API
    - Google Docs API
+   - Places API
+   - Routes API
 4. Configure the OAuth consent screen.
 5. Create OAuth client credentials:
    - `APIs & Services` -> `Credentials` -> `Create Credentials` -> `OAuth client ID`
@@ -152,13 +154,16 @@ Optional future Maps Platform setup for API-backed itinerary work:
 
 - set `GOOGLE_MAPS_PLATFORM` in `.env`
 - enable only the Maps Platform services you actually plan to call
-- current Maps tools still only build links and do not call Maps Platform APIs yet
+- `GOOGLE_MAPS_API_KEY` enables the API-backed Maps tools
+- without a Maps API key, the link-builder tools still work but the API-backed tools return a structured configuration error
+- `GOOGLE_MAPS_PLATFORM` remains optional project/platform metadata for future use
 
 Env vars:
 
 - `MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE=/secrets/google-credentials.json`
 - `MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE=/secrets/google-token.json`
 - `MYTHOSAUR_TOOLS_GOOGLE_*_ENABLED=true|false`
+- `GOOGLE_MAPS_API_KEY=<your-maps-api-key>`
 - `GOOGLE_MAPS_PLATFORM=<your-project-or-platform-id>`
 - `NOTEBOOKLM_MCP_CLI_PATH=/secrets/notebooklm`
 - `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=mythosaur`
@@ -181,6 +186,8 @@ Current Google MCP tools:
 - `google_docs_create`
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
+- `google_maps_search_places`
+- `google_maps_compute_route`
 - `notebooklm_auth_status`
 - `notebooklm_list_notebooks`
 - `notebooklm_query_notebook`

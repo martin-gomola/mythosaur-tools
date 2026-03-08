@@ -240,9 +240,10 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 | `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED` | No | `false` | Allow Sheets write tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_DOCS_READ_ENABLED` | No | `true` | Allow Google Docs read tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED` | No | `false` | Allow Google Docs create/write tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED` | No | `true` | Allow Google Maps link builders |
+| `MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED` | No | `true` | Allow Google Maps tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_MAPS_NAVIGATE_DEFAULT` | No | `false` | Add `dir_action=navigate` by default to route links |
-| `GOOGLE_MAPS_PLATFORM` | No | — | Optional Google Maps Platform project identifier for future API-backed Maps or itinerary features |
+| `GOOGLE_MAPS_API_KEY` | No | — | Google Maps API key used by Places and Routes API tools |
+| `GOOGLE_MAPS_PLATFORM` | No | — | Optional Google Maps Platform project identifier for future metadata or routing policy use |
 | `MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN` | No | `nlm` | NotebookLM CLI binary used by the wrapper tools |
 | `MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED` | No | `true` | Allow NotebookLM tools at runtime |
 | `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE` | No | `mythosaur` | NotebookLM auth profile to use inside the container |
@@ -276,6 +277,8 @@ Available tools:
 - `google_docs_create`
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
+- `google_maps_search_places`
+- `google_maps_compute_route`
 - `notebooklm_auth_status`
 - `notebooklm_list_notebooks`
 - `notebooklm_query_notebook`
@@ -299,6 +302,8 @@ Minimal operator flow:
    - Google Drive API
    - Google Sheets API
    - Google Docs API
+   - Places API
+   - Routes API
 4. Configure the OAuth consent screen.
 5. Create OAuth client credentials:
    - `APIs & Services` -> `Credentials` -> `Create Credentials` -> `OAuth client ID`
@@ -334,9 +339,11 @@ Runtime capability flags are a second control layer above OAuth. Use them to dis
 
 Optional future Maps Platform setup for API-backed itinerary work:
 
+- set `GOOGLE_MAPS_API_KEY` in `.env` for Places and Routes API-backed tools
 - set `GOOGLE_MAPS_PLATFORM` in `.env`
 - enable only the Maps Platform services you actually plan to call
-- current Maps tools still only build links and do not call Maps Platform APIs yet
+- link-builder tools work without the key
+- `google_maps_search_places` and `google_maps_compute_route` require the key
 
 ---
 

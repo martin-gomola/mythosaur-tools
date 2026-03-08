@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
+import requests
+
 from .common import ToolDef, err, now_ms, ok, parse_int, resolve_under_workspace
 
 GOOGLE_PLUGIN_ID = "mythosaur.google_workspace"
@@ -21,6 +23,7 @@ SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 SHEETS_WRITE_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 DOCS_SCOPES = ["https://www.googleapis.com/auth/documents.readonly"]
 DOCS_WRITE_SCOPES = ["https://www.googleapis.com/auth/documents"]
+_MAPS_DEFAULT_TIMEOUT_SEC = 20
 
 
 def _google_modules():
@@ -82,6 +85,94 @@ def _bool_env(name: str, default: bool = False) -> bool:
     if not raw:
         return default
     return raw in {"1", "true", "yes", "on"}
+
+
+def _maps_api_key_value() -> str:
+    direct = (os.getenv("GOOGLE_MAPS_API_KEY") or "").strip()
+    if direct:
+        return direct
+
+    # Backward-compatibility: older local envs incorrectly stored the API key here.
+    legacy = (os.getenv("GOOGLE_MAPS_PLATFORM") or "").strip()
+    if legacy.startswith("AIza"):
+        return legacy
+    return ""
+
+
+def _maps_api_guard(tool_name: str, started: int) -> dict[str, Any] | None:
+    if _maps_api_key_value():
+        return None
+    return err(
+        tool_name,
+        "maps_api_key_missing",
+        "Google Maps API key is not configured. Set GOOGLE_MAPS_API_KEY.",
+        "google",
+        started,
+    )
+
+
+def _maps_post(tool_name: str, url: str, payload: dict[str, Any], field_mask: str, started: int) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    blocked = _maps_api_guard(tool_name, started)
+    if blocked:
+        return None, blocked
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": _maps_api_key_value(),
+        "X-Goog-FieldMask": field_mask,
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=_MAPS_DEFAULT_TIMEOUT_SEC)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        message = str(exc)
+        if exc.response is not None:
+            try:
+                error_payload = exc.response.json()
+                message = ((error_payload.get("error") or {}).get("message")) or exc.response.text or message
+            except ValueError:
+                message = exc.response.text or message
+        return None, err(tool_name, "maps_api_failed", message, "google", started)
+
+    try:
+        return response.json(), None
+    except ValueError as exc:
+        return None, err(tool_name, "maps_api_invalid_response", str(exc), "google", started)
+
+
+def _maps_normalize_travel_mode(raw: str) -> str:
+    value = raw.strip().lower()
+    mapping = {
+        "drive": "DRIVE",
+        "driving": "DRIVE",
+        "walk": "WALK",
+        "walking": "WALK",
+        "bicycle": "BICYCLE",
+        "bike": "BICYCLE",
+        "transit": "TRANSIT",
+        "two_wheeler": "TWO_WHEELER",
+        "two-wheeler": "TWO_WHEELER",
+        "motorcycle": "TWO_WHEELER",
+    }
+    return mapping.get(value, raw.strip().upper() or "DRIVE")
+
+
+def _maps_link_travel_mode(raw: str) -> str:
+    value = raw.strip().lower()
+    mapping = {
+        "drive": "driving",
+        "driving": "driving",
+        "walk": "walking",
+        "walking": "walking",
+        "bicycle": "bicycling",
+        "bike": "bicycling",
+        "transit": "transit",
+        "two_wheeler": "driving",
+        "two-wheeler": "driving",
+        "motorcycle": "driving",
+    }
+    return mapping.get(value, value or "driving")
 
 
 def google_capabilities() -> dict[str, bool]:
@@ -257,11 +348,16 @@ def _gmail_unread(args: dict[str, Any]) -> dict[str, Any]:
         return blocked
     max_results = parse_int(args.get("max_results"), 10, minimum=1, maximum=50)
     include_snippets = bool(args.get("include_snippets", False))
-    label_ids = args.get("label_ids") or ["INBOX", "UNREAD"]
+    unread_only = bool(args.get("unread_only", False))
+    label_ids = list(args.get("label_ids") or ["INBOX"])
+    if unread_only and "UNREAD" not in label_ids:
+        label_ids.append("UNREAD")
 
     try:
         service = _build_service("gmail", "v1", GMAIL_SCOPES)
         list_payload = service.users().messages().list(userId="me", labelIds=label_ids, maxResults=max_results).execute()
+        unread_label_ids = label_ids if "UNREAD" in label_ids else [*label_ids, "UNREAD"]
+        unread_payload = service.users().messages().list(userId="me", labelIds=unread_label_ids, maxResults=1).execute()
     except Exception as exc:
         return err("gmail_unread", "gmail_failed", str(exc), "google", started)
 
@@ -280,6 +376,8 @@ def _gmail_unread(args: dict[str, Any]) -> dict[str, Any]:
             "subject": headers.get("subject", ""),
             "from": headers.get("from", ""),
             "date": headers.get("date", ""),
+            "label_ids": detail.get("labelIds") or [],
+            "is_unread": "UNREAD" in (detail.get("labelIds") or []),
         }
         if include_snippets:
             row["snippet"] = detail.get("snippet", "")
@@ -288,7 +386,11 @@ def _gmail_unread(args: dict[str, Any]) -> dict[str, Any]:
     return ok(
         "gmail_unread",
         {
-            "unread_count": list_payload.get("resultSizeEstimate", len(messages)),
+            "message_count": list_payload.get("resultSizeEstimate", len(messages)),
+            "unread_count": unread_payload.get(
+                "resultSizeEstimate",
+                sum(1 for message in messages if message["is_unread"]),
+            ),
             "messages": messages,
         },
         "google",
@@ -873,7 +975,7 @@ def _maps_build_route_link(args: dict[str, Any]) -> dict[str, Any]:
             started,
         )
 
-    travel_mode = (args.get("travel_mode") or "driving").strip() or "driving"
+    travel_mode = _maps_link_travel_mode(str(args.get("travel_mode") or "driving"))
     waypoints = _listify_strings(args.get("waypoints"))
     params = {
         "api": 1,
@@ -937,6 +1039,162 @@ def _maps_build_place_link(args: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def _maps_search_places(args: dict[str, Any]) -> dict[str, Any]:
+    started = now_ms()
+    blocked = _capability_guard("google_maps_search_places", "maps", started)
+    if blocked:
+        return blocked
+
+    query = (args.get("query") or "").strip()
+    if not query:
+        return err("google_maps_search_places", "missing_args", "query is required", "google", started)
+
+    payload: dict[str, Any] = {
+        "textQuery": query,
+        "maxResultCount": parse_int(args.get("max_results"), 5, minimum=1, maximum=10),
+    }
+    if language_code := (args.get("language_code") or "").strip():
+        payload["languageCode"] = language_code
+    if region_code := (args.get("region_code") or "").strip():
+        payload["regionCode"] = region_code
+    if included_type := (args.get("included_type") or "").strip():
+        payload["includedType"] = included_type
+    if "open_now" in args:
+        payload["openNow"] = bool(args.get("open_now"))
+
+    response_json, api_error = _maps_post(
+        "google_maps_search_places",
+        "https://places.googleapis.com/v1/places:searchText",
+        payload,
+        "places.id,places.displayName,places.formattedAddress,places.googleMapsUri,places.location,places.types,nextPageToken",
+        started,
+    )
+    if api_error:
+        return api_error
+
+    places = []
+    for place in response_json.get("places") or []:
+        location = place.get("location") or {}
+        places.append(
+            {
+                "id": place.get("id", ""),
+                "display_name": ((place.get("displayName") or {}).get("text")) or "",
+                "formatted_address": place.get("formattedAddress", ""),
+                "google_maps_uri": place.get("googleMapsUri", ""),
+                "location": {
+                    "latitude": location.get("latitude"),
+                    "longitude": location.get("longitude"),
+                },
+                "types": place.get("types") or [],
+            }
+        )
+
+    return ok(
+        "google_maps_search_places",
+        {
+            "query": query,
+            "places": places,
+            "next_page_token": response_json.get("nextPageToken", ""),
+        },
+        "google",
+        started,
+    )
+
+
+def _maps_compute_route(args: dict[str, Any]) -> dict[str, Any]:
+    started = now_ms()
+    blocked = _capability_guard("google_maps_compute_route", "maps", started)
+    if blocked:
+        return blocked
+
+    origin = (args.get("origin") or "").strip()
+    destination = (args.get("destination") or "").strip()
+    if not origin or not destination:
+        return err(
+            "google_maps_compute_route",
+            "missing_args",
+            "origin and destination are required",
+            "google",
+            started,
+        )
+
+    travel_mode = _maps_normalize_travel_mode(str(args.get("travel_mode") or "DRIVE"))
+    payload: dict[str, Any] = {
+        "origin": {"address": origin},
+        "destination": {"address": destination},
+        "travelMode": travel_mode,
+        "computeAlternativeRoutes": bool(args.get("alternatives", False)),
+    }
+    if departure_time := (args.get("departure_time") or "").strip():
+        payload["departureTime"] = departure_time
+    if routing_preference := (args.get("routing_preference") or "").strip():
+        payload["routingPreference"] = routing_preference.strip().upper()
+
+    intermediates = []
+    for waypoint in _listify_strings(args.get("waypoints")):
+        intermediates.append({"address": waypoint})
+    if intermediates:
+        payload["intermediates"] = intermediates
+
+    response_json, api_error = _maps_post(
+        "google_maps_compute_route",
+        "https://routes.googleapis.com/directions/v2:computeRoutes",
+        payload,
+        "routes.duration,routes.distanceMeters,routes.description,routes.polyline.encodedPolyline,routes.legs.duration,routes.legs.distanceMeters,routes.legs.steps.navigationInstruction.instructions",
+        started,
+    )
+    if api_error:
+        return api_error
+
+    routes = []
+    for route in response_json.get("routes") or []:
+        legs = []
+        for leg in route.get("legs") or []:
+            steps = []
+            for step in leg.get("steps") or []:
+                instructions = ((step.get("navigationInstruction") or {}).get("instructions")) or ""
+                if instructions:
+                    steps.append(instructions)
+            legs.append(
+                {
+                    "distance_meters": leg.get("distanceMeters"),
+                    "duration": leg.get("duration"),
+                    "steps": steps,
+                }
+            )
+        routes.append(
+            {
+                "description": route.get("description", ""),
+                "distance_meters": route.get("distanceMeters"),
+                "duration": route.get("duration"),
+                "polyline": ((route.get("polyline") or {}).get("encodedPolyline")) or "",
+                "legs": legs,
+            }
+        )
+
+    return ok(
+        "google_maps_compute_route",
+        {
+            "origin": origin,
+            "destination": destination,
+            "travel_mode": travel_mode,
+            "waypoints": _listify_strings(args.get("waypoints")),
+            "routes": routes,
+            "route_link": _maps_build_route_link(
+                {
+                    "origin": origin,
+                    "destination": destination,
+                    "waypoints": _listify_strings(args.get("waypoints")),
+                    "travel_mode": _maps_link_travel_mode(travel_mode),
+                    "navigate": bool(args.get("navigate")),
+                }
+            )["data"]["url"],
+        },
+        "google",
+        started,
+    )
+
+
 def get_tools() -> list[ToolDef]:
     return [
         ToolDef(
@@ -986,13 +1244,14 @@ def get_tools() -> list[ToolDef]:
         ToolDef(
             name="gmail_unread",
             plugin_id=GOOGLE_PLUGIN_ID,
-            description="Return unread Gmail messages for the active account.",
+            description="Return recent Gmail inbox messages for the active account, including unread status.",
             input_schema={
                 "type": "object",
                 "additionalProperties": False,
                 "properties": {
                     "max_results": {"type": "integer"},
                     "include_snippets": {"type": "boolean"},
+                    "unread_only": {"type": "boolean"},
                     "label_ids": {"type": "array", "items": {"type": "string"}},
                 },
                 "required": [],
@@ -1229,5 +1488,47 @@ def get_tools() -> list[ToolDef]:
             },
             handler=_maps_build_place_link,
             aliases=["osaurus.google_maps_build_place_link"],
+        ),
+        ToolDef(
+            name="google_maps_search_places",
+            plugin_id=GOOGLE_PLUGIN_ID,
+            description="Search Google Maps Places by text query using the Google Maps Places API.",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "query": {"type": "string"},
+                    "max_results": {"type": "integer"},
+                    "language_code": {"type": "string"},
+                    "region_code": {"type": "string"},
+                    "included_type": {"type": "string"},
+                    "open_now": {"type": "boolean"},
+                },
+                "required": ["query"],
+            },
+            handler=_maps_search_places,
+            aliases=["osaurus.google_maps_search_places"],
+        ),
+        ToolDef(
+            name="google_maps_compute_route",
+            plugin_id=GOOGLE_PLUGIN_ID,
+            description="Compute routes between origin and destination using the Google Routes API.",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "origin": {"type": "string"},
+                    "destination": {"type": "string"},
+                    "waypoints": {"type": "array", "items": {"type": "string"}},
+                    "travel_mode": {"type": "string"},
+                    "routing_preference": {"type": "string"},
+                    "departure_time": {"type": "string"},
+                    "alternatives": {"type": "boolean"},
+                    "navigate": {"type": "boolean"},
+                },
+                "required": ["origin", "destination"],
+            },
+            handler=_maps_compute_route,
+            aliases=["osaurus.google_maps_compute_route"],
         ),
     ]

@@ -12,8 +12,11 @@ def _set_api_key(monkeypatch):
 
 @pytest.fixture
 def client():
-    from services.mcp_server.app import app
-    return TestClient(app)
+    from importlib import reload
+    import services.mcp_server.app as app_module
+
+    reload(app_module)
+    return TestClient(app_module.app)
 
 
 def _auth():
@@ -202,6 +205,54 @@ class TestMcpToolsCall:
         )
         body = resp.json()
         assert body["result"]["structuredContent"]["status"] == "ok"
+
+    def test_usage_summary_logs_on_first_call(self, client, caplog):
+        caplog.set_level("INFO")
+
+        resp = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 7,
+                "method": "tools/call",
+                "params": {"name": "current_time", "arguments": {"timezone": "UTC"}},
+            },
+            headers=_auth(),
+        )
+
+        assert resp.status_code == 200
+        assert "mcp.usage total_calls=1 unique_tools=1 top_tools=current_time:1" in caplog.text
+
+    def test_usage_summary_logs_after_configured_call_interval(self, monkeypatch, caplog):
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_API_KEY", "test-key-123")
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "0")
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_USAGE_LOG_EVERY", "2")
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_USAGE_LOG_INTERVAL_SEC", "3600")
+
+        from importlib import reload
+        import services.mcp_server.app as app_module
+
+        reload(app_module)
+        rate_client = TestClient(app_module.app)
+        caplog.set_level("INFO")
+
+        for request_id in (8, 9):
+            resp = rate_client.post(
+                "/mcp",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "method": "tools/call",
+                    "params": {"name": "current_time", "arguments": {"timezone": "UTC"}},
+                },
+                headers=_auth(),
+            )
+            assert resp.status_code == 200
+
+        usage_lines = [line for line in caplog.messages if line.startswith("mcp.usage ")]
+        assert len(usage_lines) == 2
+        assert "total_calls=2" in usage_lines[-1]
+        assert "top_tools=current_time:2" in usage_lines[-1]
 
 
 class TestRateLimiting:

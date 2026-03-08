@@ -24,6 +24,36 @@ SESSIONS: dict[str, dict[str, Any]] = {}
 _RATE_WINDOW_SEC = 60
 _RATE_MAX_CALLS = int(os.getenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "120"))
 _rate_ledger: dict[str, list[float]] = collections.defaultdict(list)
+_USAGE_LOG_EVERY = int(os.getenv("MYTHOSAUR_TOOLS_USAGE_LOG_EVERY", "5"))
+_USAGE_SUMMARY_INTERVAL_SEC = int(os.getenv("MYTHOSAUR_TOOLS_USAGE_LOG_INTERVAL_SEC", "60"))
+_usage_total_calls = 0
+_usage_tool_counts: collections.Counter[str] = collections.Counter()
+_usage_last_summary_at = 0.0
+
+
+def _record_tool_usage(name: str, status: str, duration_ms: int) -> None:
+    global _usage_total_calls, _usage_last_summary_at
+
+    _usage_total_calls += 1
+    _usage_tool_counts[name] += 1
+
+    now = time.time()
+    due_by_count = _USAGE_LOG_EVERY > 0 and _usage_total_calls % _USAGE_LOG_EVERY == 0
+    due_by_time = _USAGE_SUMMARY_INTERVAL_SEC > 0 and (now - _usage_last_summary_at) >= _USAGE_SUMMARY_INTERVAL_SEC
+    if _usage_total_calls != 1 and not due_by_count and not due_by_time:
+        return
+
+    _usage_last_summary_at = now
+    top_tools = ",".join(f"{tool}:{count}" for tool, count in _usage_tool_counts.most_common(3))
+    logging.info(
+        "mcp.usage total_calls=%s unique_tools=%s top_tools=%s last_tool=%s last_status=%s last_duration_ms=%s",
+        _usage_total_calls,
+        len(_usage_tool_counts),
+        top_tools or "-",
+        name,
+        status,
+        duration_ms,
+    )
 
 
 def _require_auth(auth_header: str | None) -> str:
@@ -227,6 +257,7 @@ async def mcp_endpoint(
             tool_result.get("status"),
             elapsed_ms,
         )
+        _record_tool_usage(name, str(tool_result.get("status") or "unknown"), elapsed_ms)
         return _response(request_id, result=_to_mcp_content(tool_result))
 
     return _response(

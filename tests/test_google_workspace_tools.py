@@ -43,17 +43,34 @@ class _CalendarService:
 
 
 class _GmailGet:
+    def __init__(self, message_id):
+        self.message_id = message_id
+
     def execute(self):
+        if self.message_id == "msg1":
+            return {
+                "threadId": "thr1",
+                "labelIds": ["INBOX", "UNREAD"],
+                "payload": {
+                    "headers": [
+                        {"name": "Subject", "value": "Demo"},
+                        {"name": "From", "value": "team@example.com"},
+                        {"name": "Date", "value": "Fri, 6 Mar 2026 10:00:00 +0000"},
+                    ]
+                },
+                "snippet": "hello",
+            }
         return {
-            "threadId": "thr1",
+            "threadId": "thr2",
+            "labelIds": ["INBOX"],
             "payload": {
                 "headers": [
-                    {"name": "Subject", "value": "Demo"},
-                    {"name": "From", "value": "team@example.com"},
-                    {"name": "Date", "value": "Fri, 6 Mar 2026 10:00:00 +0000"},
+                    {"name": "Subject", "value": "Roadmap"},
+                    {"name": "From", "value": "product@example.com"},
+                    {"name": "Date", "value": "Fri, 6 Mar 2026 09:00:00 +0000"},
                 ]
             },
-            "snippet": "hello",
+            "snippet": "plan",
         }
 
 
@@ -64,14 +81,18 @@ class _GmailSend:
 
 class _GmailMessages:
     def list(self, **kwargs):
+        label_ids = kwargs.get("labelIds") or []
+
         class _Result:
             def execute(self_nonlocal):
-                return {"resultSizeEstimate": 1, "messages": [{"id": "msg1"}]}
+                if "UNREAD" in label_ids:
+                    return {"resultSizeEstimate": 1, "messages": [{"id": "msg1"}]}
+                return {"resultSizeEstimate": 2, "messages": [{"id": "msg1"}, {"id": "msg2"}]}
 
         return _Result()
 
     def get(self, **kwargs):
-        return _GmailGet()
+        return _GmailGet(kwargs["id"])
 
     def send(self, **kwargs):
         return _GmailSend()
@@ -234,6 +255,22 @@ class _MediaInMemoryUpload:
         self.resumable = resumable
 
 
+class _MapsResponse:
+    def __init__(self, payload, status_code=200, text=""):
+        self._payload = payload
+        self.status_code = status_code
+        self.text = text or ""
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            error = google_tools.requests.HTTPError(self.text or "maps error")
+            error.response = self
+            raise error
+
+    def json(self):
+        return self._payload
+
+
 def test_google_calendar_events(monkeypatch):
     monkeypatch.setattr(google_tools, "_build_service", lambda *args, **kwargs: _CalendarService())
     result = google_tools._calendar_events(
@@ -264,6 +301,20 @@ def test_gmail_unread(monkeypatch):
     result = google_tools._gmail_unread({"max_results": 5, "include_snippets": True})
     assert result["status"] == "ok"
     assert result["data"]["unread_count"] == 1
+    assert result["data"]["message_count"] == 2
+    assert result["data"]["messages"][0]["subject"] == "Demo"
+    assert result["data"]["messages"][0]["is_unread"] is True
+    assert result["data"]["messages"][1]["subject"] == "Roadmap"
+    assert result["data"]["messages"][1]["is_unread"] is False
+
+
+def test_gmail_unread_only(monkeypatch):
+    monkeypatch.setattr(google_tools, "_build_service", lambda *args, **kwargs: _GmailService())
+    result = google_tools._gmail_unread({"max_results": 5, "unread_only": True})
+    assert result["status"] == "ok"
+    assert result["data"]["unread_count"] == 1
+    assert result["data"]["message_count"] == 1
+    assert len(result["data"]["messages"]) == 1
     assert result["data"]["messages"][0]["subject"] == "Demo"
 
 
@@ -391,6 +442,87 @@ def test_google_maps_build_place_link():
     assert result["status"] == "ok"
     assert "google.com/maps/search/" in result["data"]["url"]
     assert "Bratislava+Castle" in result["data"]["url"]
+
+
+def test_google_maps_search_places(monkeypatch):
+    monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "maps-key")
+
+    def _fake_post(url, json, headers, timeout):
+        assert url == "https://places.googleapis.com/v1/places:searchText"
+        assert json["textQuery"] == "coffee in Vienna"
+        assert headers["X-Goog-Api-Key"] == "maps-key"
+        return _MapsResponse(
+            {
+                "places": [
+                    {
+                        "id": "place1",
+                        "displayName": {"text": "Cafe Central"},
+                        "formattedAddress": "Herrengasse 14, Vienna",
+                        "googleMapsUri": "https://maps.google.com/?cid=place1",
+                        "location": {"latitude": 48.21, "longitude": 16.36},
+                        "types": ["cafe", "food"],
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(google_tools.requests, "post", _fake_post)
+    result = google_tools._maps_search_places({"query": "coffee in Vienna", "max_results": 3})
+
+    assert result["status"] == "ok"
+    assert result["data"]["places"][0]["display_name"] == "Cafe Central"
+    assert result["data"]["places"][0]["location"]["latitude"] == 48.21
+
+
+def test_google_maps_compute_route(monkeypatch):
+    monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "maps-key")
+
+    def _fake_post(url, json, headers, timeout):
+        assert url == "https://routes.googleapis.com/directions/v2:computeRoutes"
+        assert json["origin"]["address"] == "Bratislava"
+        assert json["destination"]["address"] == "Vienna"
+        assert json["travelMode"] == "DRIVE"
+        assert headers["X-Goog-Api-Key"] == "maps-key"
+        return _MapsResponse(
+            {
+                "routes": [
+                    {
+                        "description": "via A4",
+                        "distanceMeters": 79000,
+                        "duration": "4800s",
+                        "polyline": {"encodedPolyline": "abcd"},
+                        "legs": [
+                            {
+                                "distanceMeters": 79000,
+                                "duration": "4800s",
+                                "steps": [
+                                    {"navigationInstruction": {"instructions": "Head north"}},
+                                    {"navigationInstruction": {"instructions": "Merge onto A4"}},
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(google_tools.requests, "post", _fake_post)
+    result = google_tools._maps_compute_route({"origin": "Bratislava", "destination": "Vienna"})
+
+    assert result["status"] == "ok"
+    assert result["data"]["routes"][0]["distance_meters"] == 79000
+    assert result["data"]["routes"][0]["legs"][0]["steps"][0] == "Head north"
+    assert "google.com/maps/dir/" in result["data"]["route_link"]
+
+
+def test_google_maps_api_tools_require_key(monkeypatch):
+    monkeypatch.delenv("GOOGLE_MAPS_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_MAPS_PLATFORM", raising=False)
+
+    result = google_tools._maps_search_places({"query": "coffee"})
+
+    assert result["status"] == "error"
+    assert result["error"]["code"] == "maps_api_key_missing"
 
 
 def test_google_capability_guard(monkeypatch):
