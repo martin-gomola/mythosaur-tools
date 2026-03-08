@@ -58,6 +58,8 @@ class TestHealthz:
         google_plugin = next(p for p in body["plugins"] if p["plugin_id"] == "mythosaur.google_workspace")
         assert "capabilities" in google_plugin
         assert "gmail_send" in google_plugin["capabilities"]
+        assert "auth" in google_plugin
+        assert "granted_scopes" in google_plugin["auth"]
 
 
 class TestSchema:

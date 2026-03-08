@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import mimetypes
 import os
 from email.message import EmailMessage
@@ -24,6 +25,19 @@ SHEETS_WRITE_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 DOCS_SCOPES = ["https://www.googleapis.com/auth/documents.readonly"]
 DOCS_WRITE_SCOPES = ["https://www.googleapis.com/auth/documents"]
 _MAPS_DEFAULT_TIMEOUT_SEC = 20
+
+_GOOGLE_SCOPE_REQUIREMENTS = {
+    "gmail_read": GMAIL_SCOPES,
+    "gmail_send": GMAIL_SEND_SCOPES,
+    "calendar_read": CALENDAR_SCOPES,
+    "calendar_write": CALENDAR_WRITE_SCOPES,
+    "drive_read": DRIVE_SCOPES,
+    "drive_write": DRIVE_WRITE_SCOPES,
+    "sheets_read": SHEETS_SCOPES,
+    "sheets_write": SHEETS_WRITE_SCOPES,
+    "docs_read": DOCS_SCOPES,
+    "docs_write": DOCS_WRITE_SCOPES,
+}
 
 
 def _google_modules():
@@ -189,6 +203,53 @@ def google_capabilities() -> dict[str, bool]:
         "docs_write": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED", False),
         "notebooklm": _bool_env("MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED", True),
         "maps": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED", True),
+    }
+
+
+def google_auth_status() -> dict[str, Any]:
+    token_file = _token_file()
+    if not token_file.exists():
+        return {
+            "token_file": str(token_file),
+            "token_present": False,
+            "granted_scopes": [],
+            "scope_checks": {},
+        }
+
+    try:
+        payload = json.loads(token_file.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "token_file": str(token_file),
+            "token_present": True,
+            "granted_scopes": [],
+            "scope_checks": {},
+            "error": f"invalid token file: {exc}",
+        }
+
+    raw_scopes = payload.get("scopes") or payload.get("scope") or []
+    if isinstance(raw_scopes, str):
+        granted_scopes = [item.strip() for item in raw_scopes.split() if item.strip()]
+    elif isinstance(raw_scopes, list):
+        granted_scopes = [str(item).strip() for item in raw_scopes if str(item).strip()]
+    else:
+        granted_scopes = []
+
+    granted = set(granted_scopes)
+    checks: dict[str, dict[str, Any]] = {}
+    for capability, required in _GOOGLE_SCOPE_REQUIREMENTS.items():
+        missing = [scope for scope in required if scope not in granted]
+        checks[capability] = {
+            "required_scopes": list(required),
+            "granted": not missing,
+            "missing_scopes": missing,
+        }
+
+    return {
+        "token_file": str(token_file),
+        "token_present": True,
+        "granted_scopes": granted_scopes,
+        "scope_checks": checks,
     }
 
 
