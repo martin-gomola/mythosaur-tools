@@ -17,7 +17,7 @@ def _tool_bin() -> str:
 
 
 def _storage_dir() -> Path:
-    raw = (os.getenv("NOTEBOOKLM_MCP_CLI_PATH") or "/data/notebooklm").strip() or "/data/notebooklm"
+    raw = (os.getenv("NOTEBOOKLM_MCP_CLI_PATH") or "/secrets/notebooklm").strip() or "/secrets/notebooklm"
     return Path(raw)
 
 

@@ -49,7 +49,7 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 | `mythosaur.fetch` | `fetch`, `fetch_json`, `fetch_html`, `download` |
 | `mythosaur.search` | `search`, `search_news`, `search_images` |
 | `mythosaur.filesystem` | `read_file`, `write_file`, `list_directory`, `create_directory`, `delete_file`, `move_file`, `search_files`, `get_file_info` |
-| `mythosaur.google_workspace` | `google_calendar_events`, `google_calendar_create_event`, `gmail_unread`, `gmail_send`, `google_drive_recent_files`, `google_drive_create_folder`, `google_drive_create_text_file`, `google_drive_upload_file`, `google_sheets_read_range`, `google_sheets_write_range`, `google_sheets_append_rows`, `google_sheets_create_sheet`, `google_maps_build_route_link`, `google_maps_build_place_link`, `notebooklm_auth_status`, `notebooklm_list_notebooks`, `notebooklm_query_notebook` |
+| `mythosaur.google_workspace` | `google_calendar_events`, `google_calendar_create_event`, `gmail_unread`, `gmail_send`, `google_drive_recent_files`, `google_drive_create_folder`, `google_drive_create_text_file`, `google_drive_upload_file`, `google_sheets_read_range`, `google_sheets_write_range`, `google_sheets_append_rows`, `google_sheets_create_sheet`, `google_docs_get`, `google_docs_create`, `google_maps_build_route_link`, `google_maps_build_place_link`, `notebooklm_auth_status`, `notebooklm_list_notebooks`, `notebooklm_query_notebook` |
 | `mythosaur.pii` | `scan_pii_staged`, `scan_pii_repo`, `install_pii_precommit_hook` |
 
 ## Security Defaults
@@ -58,11 +58,12 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 - PII guard: repo scan paths must resolve under `MYTHOSAUR_TOOLS_PII_ROOT` (defaults to the workspace root)
 - Base-dir helpers reject NUL bytes and directory escape attempts
 - Host mount path is configured separately via `MYTHOSAUR_TOOLS_WORKSPACE_HOST`
+- When launched from `mythosaur-ai`, that repo overrides `MYTHOSAUR_TOOLS_WORKSPACE_HOST` with its `WORKSPACE_DIR`
 - Profile guard:
   - `readonly` blocks mutating filesystem tools
   - `power` enables mutating filesystem tools
 - Browser tools are disabled by default (`MYTHOSAUR_TOOLS_BROWSER_ENABLED=false`)
-- Google Workspace tools require OAuth token and credentials files mounted into `./data`
+- Google Workspace tools require OAuth token and credentials files mounted from `./secrets`
 
 ## Quick Start
 
@@ -70,8 +71,8 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 cp .env.example .env
 # set a strong token in MYTHOSAUR_TOOLS_API_KEY
 # point host workspace mount to the repo you want tools to access
-# MYTHOSAUR_TOOLS_WORKSPACE_HOST=../mythosaur-ai
-# mount Google OAuth files into ./data if you want Google Workspace tools
+# MYTHOSAUR_TOOLS_WORKSPACE_HOST=/path/to/workspace
+# mount Google OAuth files into ./secrets if you want Google Workspace tools
 # Default port sequence:
 # 8063 = mythosaur-tools searxng-cache
 # 8064 = mythosaur-tools MCP
@@ -107,18 +108,60 @@ curl -sS -X POST "$MCP_URL" \
 
 ## Google Workspace Setup
 
-Provide OAuth files in the local `data/` directory used by Docker compose:
+This repo owns the canonical auth bootstrap because it owns the MCP runtime contract and `secrets/`.
+`mythosaur-ai` can still call the same flow through a wrapper target.
 
-- `data/google-credentials.json`
-- `data/google-token.json`
+Store auth material in the local `secrets/` directory:
+
+- `secrets/google-credentials.json`
+- `secrets/google-token.json`
+
+Minimal setup:
+
+1. Open Google Cloud Console: `https://console.cloud.google.com/`
+2. Create or select a project.
+3. Enable these APIs:
+   - Gmail API
+   - Google Calendar API
+   - Google Drive API
+   - Google Sheets API
+   - Google Docs API
+4. Configure the OAuth consent screen.
+5. Create OAuth client credentials:
+   - `APIs & Services` -> `Credentials` -> `Create Credentials` -> `OAuth client ID`
+   - In `Application type`, select `Desktop app`
+   - Enter a name such as `mythosaur-google`
+   - Click `Create`
+6. Download the JSON credentials file and save it as `secrets/google-credentials.json`.
+7. From this repo, run:
+
+```bash
+make google-login
+```
+
+Important:
+
+- Use an OAuth client JSON for a Desktop app.
+- Do not use a service account key for these user-scoped Google Workspace tools.
+- `make google-login` also handles NotebookLM host login when it is enabled in `.env`.
+- The container mounts `./secrets` to `/secrets`.
+- For standalone use with Cursor or another MCP client, set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` directly in `.env`.
+- From `mythosaur-ai`, `make google-login` just delegates to this repo.
+
+Optional future Maps Platform setup for API-backed itinerary work:
+
+- set `GOOGLE_MAPS_PLATFORM` in `.env`
+- enable only the Maps Platform services you actually plan to call
+- current Maps tools still only build links and do not call Maps Platform APIs yet
 
 Env vars:
 
-- `MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE=/data/google-credentials.json`
-- `MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE=/data/google-token.json`
+- `MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE=/secrets/google-credentials.json`
+- `MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE=/secrets/google-token.json`
 - `MYTHOSAUR_TOOLS_GOOGLE_*_ENABLED=true|false`
-- `NOTEBOOKLM_MCP_CLI_PATH=/data/notebooklm`
-- `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=default`
+- `GOOGLE_MAPS_PLATFORM=<your-project-or-platform-id>`
+- `NOTEBOOKLM_MCP_CLI_PATH=/secrets/notebooklm`
+- `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=mythosaur`
 
 Current Google MCP tools:
 
@@ -134,6 +177,8 @@ Current Google MCP tools:
 - `google_sheets_write_range`
 - `google_sheets_append_rows`
 - `google_sheets_create_sheet`
+- `google_docs_get`
+- `google_docs_create`
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
 - `notebooklm_auth_status`
@@ -142,17 +187,16 @@ Current Google MCP tools:
 
 ## NotebookLM Setup
 
-Use the dedicated guide: [docs/notebooklm.md](docs/notebooklm.md)
-
-Short version:
+Default path:
 
 ```bash
 cd /path/to/mythosaur-tools
-NOTEBOOKLM_MCP_CLI_PATH="$PWD/data/notebooklm" uv tool run --from notebooklm-mcp-cli nlm login --profile mythosaur
-docker compose up -d --build
+make google-login
 ```
 
-For the broader Google write scopes used by Gmail send, Drive upload, and Sheets writes, you may need to refresh the mounted Google token if the existing token was authorized as read-only.
+That is the intended operator flow. Use the dedicated guide only for troubleshooting or manual re-login:
+
+- [docs/notebooklm.md](docs/notebooklm.md)
 
 Runtime policy is separate from OAuth scopes. The bot account can hold broad scopes, while `MYTHOSAUR_TOOLS_GOOGLE_*_ENABLED` and `MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED` decide what the runtime is actually allowed to do.
 

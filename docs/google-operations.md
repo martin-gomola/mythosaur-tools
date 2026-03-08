@@ -7,6 +7,7 @@ This document defines how Google services should fit into the Mythosaur stack wi
 Keep each system responsible for one thing:
 
 - Google Drive stores files.
+- Google Docs stores collaborative narrative documents.
 - Google Sheets stores indexes, registries, and lightweight structured rows.
 - Google Maps stores route links only.
 - NotebookLM stores research and document-grounded knowledge.
@@ -28,13 +29,15 @@ Available today in `mythosaur-tools`:
 - `google_sheets_write_range`
 - `google_sheets_append_rows`
 - `google_sheets_create_sheet`
+- `google_docs_get`
+- `google_docs_create`
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
 - `notebooklm_auth_status`
 - `notebooklm_list_notebooks`
 - `notebooklm_query_notebook`
 
-These now cover the first clean write layer for Gmail, Drive, and Sheets, plus direct text-file creation in Drive and the Phase 3 Google Maps link builders. NotebookLM creation flows are still pending.
+These now cover the first clean write layer for Gmail, Drive, Sheets, and Docs, plus direct text-file creation in Drive and the Phase 3 Google Maps link builders. NotebookLM creation flows are still pending.
 
 ## Runtime Capability Flags
 
@@ -53,6 +56,8 @@ Current env-backed capability flags:
 - `MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED`
 - `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_READ_ENABLED`
 - `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED`
+- `MYTHOSAUR_TOOLS_GOOGLE_DOCS_READ_ENABLED`
+- `MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED`
 - `MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED`
 - `MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED`
 
@@ -68,6 +73,7 @@ Recommended UI sections:
 - Gmail
 - Drive
 - Sheets
+- Docs
 - Maps
 - NotebookLM
 
@@ -107,12 +113,23 @@ Add small MCP tools, not one large "Google workflow" tool.
 - keep the current write tools narrow and stable
 - add higher-level conventions in Mythosaur, not in the tool layer
 
+### Google Docs
+
+- keep Docs tools focused on document creation and straightforward reads
+- add richer document workflows in Mythosaur, not in the tool layer
+
 ### Google Maps
 
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
 
 These should generate stable links first. Route persistence belongs in Sheets, not in the Maps layer.
+
+Optional future-facing config:
+
+- `GOOGLE_MAPS_PLATFORM`
+
+This can be reserved for richer API-backed itinerary features later, but the current Maps tools only generate links and do not require Google Maps Platform API calls.
 
 ### NotebookLM
 

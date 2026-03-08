@@ -179,6 +179,47 @@ class _SheetsService:
         return _SheetsSpreadsheets()
 
 
+class _DocsGet:
+    def execute(self):
+        return {
+            "documentId": "doc1",
+            "title": "Ops Notes",
+            "revisionId": "rev1",
+            "body": {
+                "content": [
+                    {"paragraph": {"elements": [{"textRun": {"content": "Line one.\n"}}]}},
+                    {"paragraph": {"elements": [{"textRun": {"content": "Line two.\n"}}]}},
+                ]
+            },
+        }
+
+
+class _DocsCreate:
+    def execute(self):
+        return {"documentId": "doc2", "title": "Daily Briefing", "revisionId": "rev2"}
+
+
+class _DocsBatchUpdate:
+    def execute(self):
+        return {"replies": []}
+
+
+class _DocsDocuments:
+    def get(self, **kwargs):
+        return _DocsGet()
+
+    def create(self, **kwargs):
+        return _DocsCreate()
+
+    def batchUpdate(self, **kwargs):
+        return _DocsBatchUpdate()
+
+
+class _DocsService:
+    def documents(self):
+        return _DocsDocuments()
+
+
 class _MediaFileUpload:
     def __init__(self, filename, mimetype=None, resumable=False):
         self.filename = filename
@@ -315,6 +356,25 @@ def test_google_sheets_create_sheet(monkeypatch):
     assert result["status"] == "ok"
     assert result["data"]["sheet_id"] == 99
     assert result["data"]["sheet_title"] == "Routes"
+
+
+def test_google_docs_get(monkeypatch):
+    monkeypatch.setattr(google_tools, "_build_service", lambda *args, **kwargs: _DocsService())
+    result = google_tools._docs_get({"document_id": "doc1"})
+    assert result["status"] == "ok"
+    assert result["data"]["document_id"] == "doc1"
+    assert result["data"]["title"] == "Ops Notes"
+    assert "Line one." in result["data"]["text"]
+
+
+def test_google_docs_create(monkeypatch):
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED", "true")
+    monkeypatch.setattr(google_tools, "_build_service", lambda *args, **kwargs: _DocsService())
+    result = google_tools._docs_create({"title": "Daily Briefing", "content": "Status update"})
+    assert result["status"] == "ok"
+    assert result["data"]["document_id"] == "doc2"
+    assert result["data"]["title"] == "Daily Briefing"
+    assert result["data"]["content_chars"] == len("Status update")
 
 
 def test_google_maps_build_route_link():

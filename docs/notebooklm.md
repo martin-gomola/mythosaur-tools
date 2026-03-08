@@ -5,8 +5,8 @@ This guide connects NotebookLM to `mythosaur-tools` using the dedicated Mythosau
 ## What This Uses
 
 - Host login flow: `nlm`
-- Shared auth storage: `./data/notebooklm`
-- Container path: `/data/notebooklm`
+- Shared auth storage: `./secrets/notebooklm`
+- Container path: `/secrets/notebooklm`
 - MCP tools:
   - `notebooklm_auth_status`
   - `notebooklm_list_notebooks`
@@ -14,17 +14,28 @@ This guide connects NotebookLM to `mythosaur-tools` using the dedicated Mythosau
 
 ## One-Time Setup
 
+Default path:
+
+```bash
+cd /path/to/mythosaur-tools
+make google-login
+```
+
+That is the intended operator flow. It handles the Google OAuth bootstrap first and then runs the NotebookLM host login when NotebookLM is enabled in `.env`.
+
+Manual NotebookLM-only path, only if you need to re-login or debug:
+
 1. Log in on the Mac host with the Mythosaur Google account:
 
 ```bash
 cd /path/to/mythosaur-tools
-NOTEBOOKLM_MCP_CLI_PATH="$PWD/data/notebooklm" uv tool run --from notebooklm-mcp-cli nlm login --profile mythosaur
+NOTEBOOKLM_MCP_CLI_PATH="$PWD/secrets/notebooklm" uv tool run --from notebooklm-mcp-cli nlm login --profile mythosaur
 ```
 
 2. Confirm the login still works:
 
 ```bash
-NOTEBOOKLM_MCP_CLI_PATH="$PWD/data/notebooklm" uv tool run --from notebooklm-mcp-cli nlm login --check --profile mythosaur
+NOTEBOOKLM_MCP_CLI_PATH="$PWD/secrets/notebooklm" uv tool run --from notebooklm-mcp-cli nlm login --check --profile mythosaur
 ```
 
 3. Make sure `.env` contains these values:
@@ -33,7 +44,7 @@ NOTEBOOKLM_MCP_CLI_PATH="$PWD/data/notebooklm" uv tool run --from notebooklm-mcp
 MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN=nlm
 MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=mythosaur
 MYTHOSAUR_TOOLS_NOTEBOOKLM_TIMEOUT=120
-NOTEBOOKLM_MCP_CLI_PATH=/data/notebooklm
+NOTEBOOKLM_MCP_CLI_PATH=/secrets/notebooklm
 ```
 
 4. Rebuild the service:
@@ -84,8 +95,8 @@ curl -sS -X POST "$MCP_URL" \
 
 ## Files Used
 
-- Host auth state: `data/notebooklm/`
-- Container auth state: `/data/notebooklm`
+- Host auth state: `secrets/notebooklm/`
+- Container auth state: `/secrets/notebooklm`
 - Plugin code: `services/mcp_server/plugins/notebooklm_tools.py`
 
 ## Troubleshooting
@@ -93,7 +104,7 @@ curl -sS -X POST "$MCP_URL" \
 If auth fails:
 
 ```bash
-NOTEBOOKLM_MCP_CLI_PATH="$PWD/data/notebooklm" uv tool run --from notebooklm-mcp-cli nlm login --profile mythosaur --force
+NOTEBOOKLM_MCP_CLI_PATH="$PWD/secrets/notebooklm" uv tool run --from notebooklm-mcp-cli nlm login --profile mythosaur --force
 ```
 
 If the MCP server does not show the NotebookLM tools:
@@ -105,6 +116,6 @@ docker compose logs mythosaur-tools
 
 If the login works on the host but not in Docker, verify:
 
-- `NOTEBOOKLM_MCP_CLI_PATH=/data/notebooklm` is set in `.env`
+- `NOTEBOOKLM_MCP_CLI_PATH=/secrets/notebooklm` is set in `.env`
 - `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=mythosaur` is set in `.env`
-- `./data` is mounted into the container
+- `./secrets` is mounted into the container

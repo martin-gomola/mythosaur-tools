@@ -228,8 +228,8 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 | `MYTHOSAUR_TOOLS_SEARXNG_TOKEN` | No | — | Optional SearXNG auth token |
 | `MYTHOSAUR_TOOLS_BROWSER_ENABLED` | No | `false` | Enable browser tools |
 | `MYTHOSAUR_TOOLS_BROWSER_HEADLESS` | No | `true` | Run browser headless |
-| `MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE` | No | `/data/google-credentials.json` | Google OAuth client credentials file |
-| `MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE` | No | `/data/google-token.json` | Google OAuth authorized user token file |
+| `MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE` | No | `/secrets/google-credentials.json` | Google OAuth client credentials file |
+| `MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE` | No | `/secrets/google-token.json` | Google OAuth authorized user token file |
 | `MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_READ_ENABLED` | No | `true` | Allow calendar read tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED` | No | `false` | Allow calendar event creation |
 | `MYTHOSAUR_TOOLS_GOOGLE_GMAIL_READ_ENABLED` | No | `true` | Allow Gmail read tools |
@@ -238,19 +238,25 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 | `MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED` | No | `false` | Allow Drive write tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_READ_ENABLED` | No | `true` | Allow Sheets read tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED` | No | `false` | Allow Sheets write tools |
+| `MYTHOSAUR_TOOLS_GOOGLE_DOCS_READ_ENABLED` | No | `true` | Allow Google Docs read tools |
+| `MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED` | No | `false` | Allow Google Docs create/write tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED` | No | `true` | Allow Google Maps link builders |
 | `MYTHOSAUR_TOOLS_GOOGLE_MAPS_NAVIGATE_DEFAULT` | No | `false` | Add `dir_action=navigate` by default to route links |
+| `GOOGLE_MAPS_PLATFORM` | No | — | Optional Google Maps Platform project identifier for future API-backed Maps or itinerary features |
 | `MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN` | No | `nlm` | NotebookLM CLI binary used by the wrapper tools |
 | `MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED` | No | `true` | Allow NotebookLM tools at runtime |
-| `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE` | No | `default` | NotebookLM auth profile to use inside the container |
+| `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE` | No | `mythosaur` | NotebookLM auth profile to use inside the container |
 | `MYTHOSAUR_TOOLS_NOTEBOOKLM_TIMEOUT` | No | `120` | Default NotebookLM query timeout in seconds |
-| `NOTEBOOKLM_MCP_CLI_PATH` | No | `/data/notebooklm` | Shared NotebookLM CLI state directory mounted into the container |
+| `NOTEBOOKLM_MCP_CLI_PATH` | No | `/secrets/notebooklm` | Shared NotebookLM CLI state directory mounted into the container |
 | `MYTHOSAUR_TOOLS_RATE_LIMIT` | No | `120` | Max tool calls per 60s window (0 = disabled) |
 | `LOG_LEVEL` | No | `INFO` | Python log level |
 
 ---
 
 ## Google Workspace Tools
+
+Canonical auth bootstrap lives in `mythosaur-tools` because this repo owns the MCP runtime contract and `secrets/`.
+`mythosaur-ai` can call the same flow through a wrapper target.
 
 Available tools:
 
@@ -266,6 +272,8 @@ Available tools:
 - `google_sheets_write_range`
 - `google_sheets_append_rows`
 - `google_sheets_create_sheet`
+- `google_docs_get`
+- `google_docs_create`
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
 - `notebooklm_auth_status`
@@ -278,19 +286,57 @@ NotebookLM operator guide:
 
 Expected local files for Docker compose:
 
-- `./data/google-credentials.json`
-- `./data/google-token.json`
+- `./secrets/google-credentials.json`
+- `./secrets/google-token.json`
 
-The MCP container mounts `./data` to `/data`, and the Google tools read credentials from:
+Minimal operator flow:
 
-- `/data/google-credentials.json`
-- `/data/google-token.json`
+1. Open Google Cloud Console: `https://console.cloud.google.com/`
+2. Create or select a project.
+3. Enable these APIs:
+   - Gmail API
+   - Google Calendar API
+   - Google Drive API
+   - Google Sheets API
+   - Google Docs API
+4. Configure the OAuth consent screen.
+5. Create OAuth client credentials:
+   - `APIs & Services` -> `Credentials` -> `Create Credentials` -> `OAuth client ID`
+   - In `Application type`, select `Desktop app`
+   - Enter a name such as `mythosaur-google`
+   - Click `Create`
+6. Download the JSON credentials file and save it as `./secrets/google-credentials.json`.
+7. From this repo, run:
+
+```bash
+make google-login
+```
+
+Important:
+
+- Use a Desktop app OAuth client JSON.
+- Do not use a service account key for these Google Workspace user tools.
+- `make google-login` also handles NotebookLM host login when it is enabled in `.env`.
+
+The MCP container mounts `./secrets` to `/secrets`, and the Google tools read credentials from:
+
+- `/secrets/google-credentials.json`
+- `/secrets/google-token.json`
 
 If the token is missing, expired, or not authorized for the requested scopes, the tool returns a structured MCP error.
 
-Write-capable tools such as `google_calendar_create_event`, `gmail_send`, `google_drive_upload_file`, and the Sheets write helpers need broader Google scopes than the read-only tools. If those calls fail after deployment, refresh `./data/google-token.json` with the required scopes.
+For standalone use with Cursor or another MCP client, set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` directly in `.env`. When launched by `mythosaur-ai`, that repo overrides the value with its `WORKSPACE_DIR`.
+From `mythosaur-ai`, `make google-login` just delegates to this repo.
+
+Write-capable tools such as `google_calendar_create_event`, `gmail_send`, `google_drive_upload_file`, and the Sheets write helpers need broader Google scopes than the read-only tools. If those calls fail after deployment, refresh `./secrets/google-token.json` with the required scopes.
 
 Runtime capability flags are a second control layer above OAuth. Use them to disable actions even when the bot account has the underlying scope. This is the intended backend contract for a future Mythosaur settings UI.
+
+Optional future Maps Platform setup for API-backed itinerary work:
+
+- set `GOOGLE_MAPS_PLATFORM` in `.env`
+- enable only the Maps Platform services you actually plan to call
+- current Maps tools still only build links and do not call Maps Platform APIs yet
 
 ---
 

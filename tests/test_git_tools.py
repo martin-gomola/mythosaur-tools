@@ -30,7 +30,7 @@ def test_git_status_bad_repo(tmp_path: Path, monkeypatch):
 def test_git_log_ok(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("MYTHOSAUR_TOOLS_WORKSPACE_ROOT", str(tmp_path))
     subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmp_path, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "git-test"], cwd=tmp_path, capture_output=True)
     subprocess.run(["git", "config", "user.name", "test"], cwd=tmp_path, capture_output=True)
     (tmp_path / "f.txt").write_text("hello")
     subprocess.run(["git", "add", "."], cwd=tmp_path, capture_output=True)
@@ -50,7 +50,7 @@ def test_git_log_limit_respected(tmp_path: Path, monkeypatch):
 def test_git_branch_ok(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("MYTHOSAUR_TOOLS_WORKSPACE_ROOT", str(tmp_path))
     subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmp_path, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "git-test"], cwd=tmp_path, capture_output=True)
     subprocess.run(["git", "config", "user.name", "test"], cwd=tmp_path, capture_output=True)
     (tmp_path / "f.txt").write_text("hello")
     subprocess.run(["git", "add", "."], cwd=tmp_path, capture_output=True)

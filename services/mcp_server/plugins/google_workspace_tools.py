@@ -19,6 +19,8 @@ DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
 DRIVE_WRITE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 SHEETS_WRITE_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+DOCS_SCOPES = ["https://www.googleapis.com/auth/documents.readonly"]
+DOCS_WRITE_SCOPES = ["https://www.googleapis.com/auth/documents"]
 
 
 def _google_modules():
@@ -30,12 +32,12 @@ def _google_modules():
 
 
 def _token_file() -> Path:
-    raw = (os.getenv("MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE") or "/data/google-token.json").strip()
+    raw = (os.getenv("MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE") or "/secrets/google-token.json").strip()
     return Path(raw)
 
 
 def _credentials_file() -> Path:
-    raw = (os.getenv("MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE") or "/data/google-credentials.json").strip()
+    raw = (os.getenv("MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE") or "/secrets/google-credentials.json").strip()
     return Path(raw)
 
 
@@ -92,6 +94,8 @@ def google_capabilities() -> dict[str, bool]:
         "drive_write": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", False),
         "sheets_read": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_READ_ENABLED", True),
         "sheets_write": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED", False),
+        "docs_read": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_DOCS_READ_ENABLED", True),
+        "docs_write": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED", False),
         "notebooklm": _bool_env("MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED", True),
         "maps": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED", True),
     }
@@ -752,6 +756,106 @@ def _sheets_create_sheet(args: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def _docs_extract_text(elements: list[dict[str, Any]] | None, chunks: list[str]) -> None:
+    for element in elements or []:
+        paragraph = element.get("paragraph") or {}
+        for part in paragraph.get("elements") or []:
+            text_run = (part.get("textRun") or {}).get("content")
+            if text_run:
+                chunks.append(text_run)
+
+        table = element.get("table") or {}
+        for row in table.get("tableRows") or []:
+            for cell in row.get("tableCells") or []:
+                _docs_extract_text(cell.get("content") or [], chunks)
+
+        table_of_contents = element.get("tableOfContents") or {}
+        _docs_extract_text(table_of_contents.get("content") or [], chunks)
+
+
+def _docs_get(args: dict[str, Any]) -> dict[str, Any]:
+    started = now_ms()
+    blocked = _capability_guard("google_docs_get", "docs_read", started)
+    if blocked:
+        return blocked
+
+    document_id = (args.get("document_id") or "").strip()
+    include_text = bool(args.get("include_text", True))
+    max_chars = parse_int(args.get("max_chars"), 20000, minimum=100, maximum=200000)
+    if not document_id:
+        return err("google_docs_get", "missing_args", "document_id is required", "google", started)
+
+    try:
+        service = _build_service("docs", "v1", DOCS_SCOPES)
+        payload = service.documents().get(documentId=document_id).execute()
+    except Exception as exc:
+        return err("google_docs_get", "docs_failed", str(exc), "google", started)
+
+    text = ""
+    if include_text:
+        chunks: list[str] = []
+        body = payload.get("body") or {}
+        _docs_extract_text(body.get("content") or [], chunks)
+        text = "".join(chunks).strip()
+        if len(text) > max_chars:
+            text = text[:max_chars]
+
+    return ok(
+        "google_docs_get",
+        {
+            "document_id": payload.get("documentId", document_id),
+            "title": payload.get("title", ""),
+            "revision_id": payload.get("revisionId", ""),
+            "document_url": f"https://docs.google.com/document/d/{payload.get('documentId', document_id)}/edit",
+            "text": text,
+            "truncated": include_text and len(text) == max_chars,
+        },
+        "google",
+        started,
+    )
+
+
+def _docs_create(args: dict[str, Any]) -> dict[str, Any]:
+    started = now_ms()
+    blocked = _capability_guard("google_docs_create", "docs_write", started)
+    if blocked:
+        return blocked
+
+    title = (args.get("title") or "").strip()
+    content = args.get("content")
+    if not title:
+        return err("google_docs_create", "missing_args", "title is required", "google", started)
+    if content is None:
+        content = ""
+    if not isinstance(content, str):
+        return err("google_docs_create", "invalid_content", "content must be a string", "google", started)
+
+    try:
+        service = _build_service("docs", "v1", DOCS_WRITE_SCOPES)
+        payload = service.documents().create(body={"title": title}).execute()
+        document_id = payload.get("documentId", "")
+        if content and document_id:
+            service.documents().batchUpdate(
+                documentId=document_id,
+                body={"requests": [{"insertText": {"location": {"index": 1}, "text": content}}]},
+            ).execute()
+    except Exception as exc:
+        return err("google_docs_create", "docs_create_failed", str(exc), "google", started)
+
+    return ok(
+        "google_docs_create",
+        {
+            "document_id": payload.get("documentId", ""),
+            "title": payload.get("title", title),
+            "revision_id": payload.get("revisionId", ""),
+            "document_url": f"https://docs.google.com/document/d/{payload.get('documentId', '')}/edit",
+            "content_chars": len(content),
+        },
+        "google",
+        started,
+    )
+
+
 def _maps_build_route_link(args: dict[str, Any]) -> dict[str, Any]:
     started = now_ms()
     blocked = _capability_guard("google_maps_build_route_link", "maps", started)
@@ -1057,6 +1161,39 @@ def get_tools() -> list[ToolDef]:
             },
             handler=_sheets_create_sheet,
             aliases=["osaurus.google_sheets_create_sheet"],
+        ),
+        ToolDef(
+            name="google_docs_get",
+            plugin_id=GOOGLE_PLUGIN_ID,
+            description="Read a Google Docs document and optionally return plain text content.",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "document_id": {"type": "string"},
+                    "include_text": {"type": "boolean"},
+                    "max_chars": {"type": "integer"},
+                },
+                "required": ["document_id"],
+            },
+            handler=_docs_get,
+            aliases=["osaurus.google_docs_get"],
+        ),
+        ToolDef(
+            name="google_docs_create",
+            plugin_id=GOOGLE_PLUGIN_ID,
+            description="Create a Google Docs document with optional initial text content.",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "title": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                "required": ["title"],
+            },
+            handler=_docs_create,
+            aliases=["osaurus.google_docs_create"],
         ),
         ToolDef(
             name="google_maps_build_route_link",
