@@ -5,6 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -16,6 +17,7 @@ READONLY_SCOPES = [
     "https://www.googleapis.com/auth/drive.metadata.readonly",
     "https://www.googleapis.com/auth/spreadsheets.readonly",
     "https://www.googleapis.com/auth/documents.readonly",
+    "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
 ]
 
 WORKSPACE_SCOPES = [
@@ -25,6 +27,8 @@ WORKSPACE_SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/documents",
+    "https://www.googleapis.com/auth/photoslibrary.appendonly",
+    "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
 ]
 
 SCOPE_PRESETS = {
@@ -114,8 +118,16 @@ def _load_existing_token(token_path: Path, scopes: list[str]) -> Credentials | N
         return None
     creds = Credentials.from_authorized_user_file(str(token_path), scopes)
     if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        token_path.write_text(creds.to_json(), encoding="utf-8")
+        try:
+            creds.refresh(Request())
+            token_path.write_text(creds.to_json(), encoding="utf-8")
+        except RefreshError as exc:
+            message = str(exc)
+            if "invalid_scope" in message:
+                print("Existing token refresh failed due to invalid_scope.")
+                print("Running a fresh OAuth consent flow to upgrade the token.")
+                return None
+            raise
     if not creds.valid:
         return None
 

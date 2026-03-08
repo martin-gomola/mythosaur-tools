@@ -255,6 +255,10 @@ class _MediaInMemoryUpload:
         self.resumable = resumable
 
 
+class _FakeCreds:
+    token = "photos-token"
+
+
 class _MapsResponse:
     def __init__(self, payload, status_code=200, text=""):
         self._payload = payload
@@ -268,6 +272,25 @@ class _MapsResponse:
             raise error
 
     def json(self):
+        return self._payload
+
+
+class _HTTPResponse:
+    def __init__(self, payload=None, *, status_code=200, text="", headers=None):
+        self._payload = payload
+        self.status_code = status_code
+        self.text = text
+        self.headers = headers or {"Content-Type": "application/json"}
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            error = google_tools.requests.HTTPError(self.text or "http error")
+            error.response = self
+            raise error
+
+    def json(self):
+        if self._payload is None:
+            raise ValueError("no json payload")
         return self._payload
 
 
@@ -523,6 +546,160 @@ def test_google_maps_api_tools_require_key(monkeypatch):
 
     assert result["status"] == "error"
     assert result["error"]["code"] == "maps_api_key_missing"
+
+
+def test_google_photos_create_album(monkeypatch):
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED", "true")
+    monkeypatch.setattr(google_tools, "_get_credentials", lambda scopes: _FakeCreds())
+
+    def _fake_request(method, url, headers=None, json=None, params=None, data=None, timeout=None):
+        assert method == "POST"
+        assert url == "https://photoslibrary.googleapis.com/v1/albums"
+        assert json == {"album": {"title": "Trip 2026"}}
+        assert headers["Authorization"] == "Bearer photos-token"
+        return _HTTPResponse({"id": "album1", "title": "Trip 2026", "productUrl": "https://photos.google.com/lr/album1"})
+
+    monkeypatch.setattr(google_tools.requests, "request", _fake_request)
+    result = google_tools._photos_create_album({"title": "Trip 2026"})
+
+    assert result["status"] == "ok"
+    assert result["data"]["id"] == "album1"
+
+
+def test_google_photos_list_media_items(monkeypatch):
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_READ_ENABLED", "true")
+    monkeypatch.setattr(google_tools, "_get_credentials", lambda scopes: _FakeCreds())
+
+    def _fake_request(method, url, headers=None, json=None, params=None, data=None, timeout=None):
+        assert method == "GET"
+        assert url == "https://photoslibrary.googleapis.com/v1/mediaItems"
+        return _HTTPResponse(
+            {
+                "mediaItems": [
+                    {
+                        "id": "media1",
+                        "filename": "IMG_001.jpg",
+                        "mimeType": "image/jpeg",
+                        "mediaMetadata": {
+                            "creationTime": "2026-03-01T10:00:00Z",
+                            "width": "100",
+                            "height": "200",
+                        },
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(google_tools.requests, "request", _fake_request)
+    result = google_tools._photos_list_media_items({"max_items": 5})
+
+    assert result["status"] == "ok"
+    assert result["data"]["items"][0]["id"] == "media1"
+
+
+def test_google_photos_find_duplicate_candidates(monkeypatch):
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_READ_ENABLED", "true")
+    monkeypatch.setattr(google_tools, "_get_credentials", lambda scopes: _FakeCreds())
+
+    def _fake_request(method, url, headers=None, json=None, params=None, data=None, timeout=None):
+        return _HTTPResponse(
+            {
+                "mediaItems": [
+                    {
+                        "id": "media1",
+                        "filename": "IMG_001.jpg",
+                        "mimeType": "image/jpeg",
+                        "mediaMetadata": {
+                            "creationTime": "2026-03-01T10:00:00Z",
+                            "width": "100",
+                            "height": "200",
+                        },
+                    },
+                    {
+                        "id": "media2",
+                        "filename": "IMG_001.jpg",
+                        "mimeType": "image/jpeg",
+                        "mediaMetadata": {
+                            "creationTime": "2026-03-01T10:00:00Z",
+                            "width": "100",
+                            "height": "200",
+                        },
+                    },
+                ]
+            }
+        )
+
+    monkeypatch.setattr(google_tools.requests, "request", _fake_request)
+    result = google_tools._photos_find_duplicate_candidates({"max_items": 10})
+
+    assert result["status"] == "ok"
+    assert result["data"]["duplicate_group_count"] == 1
+    assert len(result["data"]["groups"][0]) == 2
+
+
+def test_google_photos_upload_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setattr(google_tools, "_get_credentials", lambda scopes: _FakeCreds())
+
+    sample = tmp_path / "photo.jpg"
+    sample.write_bytes(b"jpeg-bytes")
+    calls = []
+
+    def _fake_request(method, url, headers=None, json=None, params=None, data=None, timeout=None):
+        calls.append((method, url, headers, json, data))
+        if url.endswith("/uploads"):
+            return _HTTPResponse(payload=None, text="upload-token-1", headers={"Content-Type": "text/plain"})
+        if url.endswith("/mediaItems:batchCreate"):
+            return _HTTPResponse(
+                {
+                    "newMediaItemResults": [
+                        {
+                            "status": {"code": 0},
+                            "mediaItem": {
+                                "id": "media1",
+                                "filename": "photo.jpg",
+                                "mimeType": "image/jpeg",
+                                "mediaMetadata": {
+                                    "creationTime": "2026-03-01T10:00:00Z",
+                                    "width": "100",
+                                    "height": "200",
+                                },
+                            },
+                        }
+                    ]
+                }
+            )
+        raise AssertionError(url)
+
+    monkeypatch.setattr(google_tools.requests, "request", _fake_request)
+    result = google_tools._photos_upload_file({"path": "photo.jpg", "album_id": "album1"})
+
+    assert result["status"] == "ok"
+    assert result["data"]["results"][0]["media_item"]["id"] == "media1"
+    assert calls[0][1] == "https://photoslibrary.googleapis.com/v1/uploads"
+    assert calls[1][1] == "https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate"
+
+
+def test_google_photos_create_curated_album(monkeypatch):
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED", "true")
+    monkeypatch.setattr(google_tools, "_get_credentials", lambda scopes: _FakeCreds())
+    calls = []
+
+    def _fake_request(method, url, headers=None, json=None, params=None, data=None, timeout=None):
+        calls.append((method, url, json))
+        if url.endswith("/v1/albums"):
+            return _HTTPResponse({"id": "album2", "title": "Favorites"})
+        if url.endswith("/albums/album2:batchAddMediaItems"):
+            return _HTTPResponse({})
+        raise AssertionError(url)
+
+    monkeypatch.setattr(google_tools.requests, "request", _fake_request)
+    result = google_tools._photos_create_curated_album({"title": "Favorites", "media_item_ids": ["m1", "m2"]})
+
+    assert result["status"] == "ok"
+    assert result["data"]["album_id"] == "album2"
+    assert calls[1][1].endswith("/albums/album2:batchAddMediaItems")
 
 
 def test_google_capability_guard(monkeypatch):

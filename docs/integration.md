@@ -240,6 +240,8 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 | `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED` | No | `false` | Allow Sheets write tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_DOCS_READ_ENABLED` | No | `true` | Allow Google Docs read tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED` | No | `false` | Allow Google Docs create/write tools |
+| `MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_READ_ENABLED` | No | `false` | Allow Google Photos app-created read tools |
+| `MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED` | No | `false` | Allow Google Photos app-created write tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED` | No | `true` | Allow Google Maps tools |
 | `MYTHOSAUR_TOOLS_GOOGLE_MAPS_NAVIGATE_DEFAULT` | No | `false` | Add `dir_action=navigate` by default to route links |
 | `GOOGLE_MAPS_API_KEY` | No | — | Google Maps API key used by Places and Routes API tools |
@@ -275,6 +277,13 @@ Available tools:
 - `google_sheets_create_sheet`
 - `google_docs_get`
 - `google_docs_create`
+- `google_photos_list_albums`
+- `google_photos_create_album`
+- `google_photos_list_media_items`
+- `google_photos_upload_file`
+- `google_photos_add_to_album`
+- `google_photos_find_duplicate_candidates`
+- `google_photos_create_curated_album`
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
 - `google_maps_search_places`
@@ -302,6 +311,7 @@ Minimal operator flow:
    - Google Drive API
    - Google Sheets API
    - Google Docs API
+   - Google Photos Library API
    - Places API
    - Routes API
 4. Configure the OAuth consent screen.
@@ -336,6 +346,12 @@ From `mythosaur-ai`, `make google-login` just delegates to this repo.
 Write-capable tools such as `google_calendar_create_event`, `gmail_send`, `google_drive_upload_file`, and the Sheets write helpers need broader Google scopes than the read-only tools. If those calls fail after deployment, refresh `./secrets/google-token.json` with the required scopes.
 
 Runtime capability flags are a second control layer above OAuth. Use them to disable actions even when the bot account has the underlying scope. This is the intended backend contract for a future Mythosaur settings UI.
+
+Current Google Photos limitation:
+
+- the MCP tools only operate on app-created Google Photos albums and media items
+- duplicate detection is heuristic over those app-created items
+- broad read access to a user’s entire personal Google Photos library is not implemented here
 
 Optional future Maps Platform setup for API-backed itinerary work:
 

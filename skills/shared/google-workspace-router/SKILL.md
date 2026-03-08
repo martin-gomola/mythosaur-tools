@@ -27,6 +27,13 @@ Use this skill for requests backed by the Google and NotebookLM tools in `mythos
 - Sheets range writes -> `google_sheets_write_range`
 - Sheets row appends -> `google_sheets_append_rows`
 - Sheets tab creation -> `google_sheets_create_sheet`
+- Photos list albums -> `google_photos_list_albums`
+- Photos create album -> `google_photos_create_album`
+- Photos list media -> `google_photos_list_media_items`
+- Photos upload -> `google_photos_upload_file`
+- Photos add to album -> `google_photos_add_to_album`
+- Photos duplicate candidates -> `google_photos_find_duplicate_candidates`
+- Photos curated album -> `google_photos_create_curated_album`
 - Maps route links -> `google_maps_build_route_link`
 - Maps place links -> `google_maps_build_place_link`
 - Maps place search -> `google_maps_search_places`
@@ -49,6 +56,11 @@ Use this skill for requests backed by the Google and NotebookLM tools in `mythos
    - reading a specific sheet range
    - writing or appending sheet data
    - creating a sheet tab
+   - creating a Google Photos album
+   - uploading a file into Google Photos
+   - listing or reviewing app-created Google Photos media
+   - grouping likely duplicate app-created photos
+   - creating a curated album from selected photo ids
    - generating a Google Maps route or place link
    - searching for places on a route
    - computing route distance and duration
@@ -66,6 +78,7 @@ These actions are planned but not currently exposed through `mythosaur-tools`:
 - creating or updating NotebookLM notebooks and sources
 - moving or deleting Drive files
 - Gmail draft creation
+- full-library duplicate scanning across the user's entire personal Google Photos library
 
 ## Role Split
 

@@ -9,6 +9,7 @@ Keep each system responsible for one thing:
 - Google Drive stores files.
 - Google Docs stores collaborative narrative documents.
 - Google Sheets stores indexes, registries, and lightweight structured rows.
+- Google Photos stores app-created media collections and curated albums.
 - Google Maps stores route links and optional API-backed route or place lookups.
 - NotebookLM stores research and document-grounded knowledge.
 - Workspace files store active project state, tasks, and decisions.
@@ -31,6 +32,13 @@ Available today in `mythosaur-tools`:
 - `google_sheets_create_sheet`
 - `google_docs_get`
 - `google_docs_create`
+- `google_photos_list_albums`
+- `google_photos_create_album`
+- `google_photos_list_media_items`
+- `google_photos_upload_file`
+- `google_photos_add_to_album`
+- `google_photos_find_duplicate_candidates`
+- `google_photos_create_curated_album`
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
 - `google_maps_search_places`
@@ -39,7 +47,7 @@ Available today in `mythosaur-tools`:
 - `notebooklm_list_notebooks`
 - `notebooklm_query_notebook`
 
-These now cover the first clean write layer for Gmail, Drive, Sheets, and Docs, plus direct text-file creation in Drive and both Google Maps link builders and API-backed itinerary primitives. NotebookLM creation flows are still pending.
+These now cover the first clean write layer for Gmail, Drive, Sheets, Docs, and app-created Google Photos albums/media, plus direct text-file creation in Drive and both Google Maps link builders and API-backed itinerary primitives. NotebookLM creation flows are still pending.
 
 ## Runtime Capability Flags
 
@@ -135,6 +143,18 @@ Maps config:
 - `GOOGLE_MAPS_PLATFORM`
 
 `GOOGLE_MAPS_API_KEY` enables the live Places and Routes tools. `GOOGLE_MAPS_PLATFORM` can still be reserved for project/platform metadata or future policy.
+
+### Google Photos
+
+- `google_photos_list_albums`
+- `google_photos_create_album`
+- `google_photos_list_media_items`
+- `google_photos_upload_file`
+- `google_photos_add_to_album`
+- `google_photos_find_duplicate_candidates`
+- `google_photos_create_curated_album`
+
+These operate on app-created Google Photos albums and media items. Duplicate detection is heuristic and limited to the media items that the current Google Photos API still allows the app to list.
 
 ### NotebookLM
 

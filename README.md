@@ -49,7 +49,7 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 | `mythosaur.fetch` | `fetch`, `fetch_json`, `fetch_html`, `download` |
 | `mythosaur.search` | `search`, `search_news`, `search_images` |
 | `mythosaur.filesystem` | `read_file`, `write_file`, `list_directory`, `create_directory`, `delete_file`, `move_file`, `search_files`, `get_file_info` |
-| `mythosaur.google_workspace` | `google_calendar_events`, `google_calendar_create_event`, `gmail_unread`, `gmail_send`, `google_drive_recent_files`, `google_drive_create_folder`, `google_drive_create_text_file`, `google_drive_upload_file`, `google_sheets_read_range`, `google_sheets_write_range`, `google_sheets_append_rows`, `google_sheets_create_sheet`, `google_docs_get`, `google_docs_create`, `google_maps_build_route_link`, `google_maps_build_place_link`, `google_maps_search_places`, `google_maps_compute_route`, `notebooklm_auth_status`, `notebooklm_list_notebooks`, `notebooklm_query_notebook` |
+| `mythosaur.google_workspace` | `google_calendar_events`, `google_calendar_create_event`, `gmail_unread`, `gmail_send`, `google_drive_recent_files`, `google_drive_create_folder`, `google_drive_create_text_file`, `google_drive_upload_file`, `google_sheets_read_range`, `google_sheets_write_range`, `google_sheets_append_rows`, `google_sheets_create_sheet`, `google_docs_get`, `google_docs_create`, `google_photos_list_albums`, `google_photos_create_album`, `google_photos_list_media_items`, `google_photos_upload_file`, `google_photos_add_to_album`, `google_photos_find_duplicate_candidates`, `google_photos_create_curated_album`, `google_maps_build_route_link`, `google_maps_build_place_link`, `google_maps_search_places`, `google_maps_compute_route`, `notebooklm_auth_status`, `notebooklm_list_notebooks`, `notebooklm_query_notebook` |
 | `mythosaur.pii` | `scan_pii_staged`, `scan_pii_repo`, `install_pii_precommit_hook` |
 
 ## Security Defaults
@@ -126,6 +126,7 @@ Minimal setup:
    - Google Drive API
    - Google Sheets API
    - Google Docs API
+   - Google Photos Library API
    - Places API
    - Routes API
 4. Configure the OAuth consent screen.
@@ -184,6 +185,13 @@ Current Google MCP tools:
 - `google_sheets_create_sheet`
 - `google_docs_get`
 - `google_docs_create`
+- `google_photos_list_albums`
+- `google_photos_create_album`
+- `google_photos_list_media_items`
+- `google_photos_upload_file`
+- `google_photos_add_to_album`
+- `google_photos_find_duplicate_candidates`
+- `google_photos_create_curated_album`
 - `google_maps_build_route_link`
 - `google_maps_build_place_link`
 - `google_maps_search_places`
@@ -208,3 +216,4 @@ That is the intended operator flow. Use the dedicated guide only for troubleshoo
 Runtime policy is separate from OAuth scopes. The bot account can hold broad scopes, while `MYTHOSAUR_TOOLS_GOOGLE_*_ENABLED` and `MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED` decide what the runtime is actually allowed to do.
 
 Calendar creation uses its own runtime gate: `MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED`.
+Google Photos tooling is currently limited to app-created albums and media items plus duplicate-candidate heuristics over those app-created items.
