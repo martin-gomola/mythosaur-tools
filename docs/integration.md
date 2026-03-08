@@ -230,6 +230,21 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 | `MYTHOSAUR_TOOLS_BROWSER_HEADLESS` | No | `true` | Run browser headless |
 | `MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE` | No | `/data/google-credentials.json` | Google OAuth client credentials file |
 | `MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE` | No | `/data/google-token.json` | Google OAuth authorized user token file |
+| `MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_READ_ENABLED` | No | `true` | Allow calendar read tools |
+| `MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED` | No | `false` | Allow calendar event creation |
+| `MYTHOSAUR_TOOLS_GOOGLE_GMAIL_READ_ENABLED` | No | `true` | Allow Gmail read tools |
+| `MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED` | No | `false` | Allow Gmail send tool |
+| `MYTHOSAUR_TOOLS_GOOGLE_DRIVE_READ_ENABLED` | No | `true` | Allow Drive read tools |
+| `MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED` | No | `false` | Allow Drive write tools |
+| `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_READ_ENABLED` | No | `true` | Allow Sheets read tools |
+| `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED` | No | `false` | Allow Sheets write tools |
+| `MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED` | No | `true` | Allow Google Maps link builders |
+| `MYTHOSAUR_TOOLS_GOOGLE_MAPS_NAVIGATE_DEFAULT` | No | `false` | Add `dir_action=navigate` by default to route links |
+| `MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN` | No | `nlm` | NotebookLM CLI binary used by the wrapper tools |
+| `MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED` | No | `true` | Allow NotebookLM tools at runtime |
+| `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE` | No | `default` | NotebookLM auth profile to use inside the container |
+| `MYTHOSAUR_TOOLS_NOTEBOOKLM_TIMEOUT` | No | `120` | Default NotebookLM query timeout in seconds |
+| `NOTEBOOKLM_MCP_CLI_PATH` | No | `/data/notebooklm` | Shared NotebookLM CLI state directory mounted into the container |
 | `MYTHOSAUR_TOOLS_RATE_LIMIT` | No | `120` | Max tool calls per 60s window (0 = disabled) |
 | `LOG_LEVEL` | No | `INFO` | Python log level |
 
@@ -240,9 +255,26 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 Available tools:
 
 - `google_calendar_events`
+- `google_calendar_create_event`
 - `gmail_unread`
+- `gmail_send`
 - `google_drive_recent_files`
+- `google_drive_create_folder`
+- `google_drive_create_text_file`
+- `google_drive_upload_file`
 - `google_sheets_read_range`
+- `google_sheets_write_range`
+- `google_sheets_append_rows`
+- `google_sheets_create_sheet`
+- `google_maps_build_route_link`
+- `google_maps_build_place_link`
+- `notebooklm_auth_status`
+- `notebooklm_list_notebooks`
+- `notebooklm_query_notebook`
+
+NotebookLM operator guide:
+
+- `docs/notebooklm.md`
 
 Expected local files for Docker compose:
 
@@ -255,6 +287,10 @@ The MCP container mounts `./data` to `/data`, and the Google tools read credenti
 - `/data/google-token.json`
 
 If the token is missing, expired, or not authorized for the requested scopes, the tool returns a structured MCP error.
+
+Write-capable tools such as `google_calendar_create_event`, `gmail_send`, `google_drive_upload_file`, and the Sheets write helpers need broader Google scopes than the read-only tools. If those calls fail after deployment, refresh `./data/google-token.json` with the required scopes.
+
+Runtime capability flags are a second control layer above OAuth. Use them to disable actions even when the bot account has the underlying scope. This is the intended backend contract for a future Mythosaur settings UI.
 
 ---
 

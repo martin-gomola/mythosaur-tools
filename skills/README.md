@@ -11,6 +11,7 @@ Current shared skills:
 - `agent-browser`
 - `tool-intent-router`
 - `pii-precommit-check`
+- `google-workspace-router`
 
 Do not edit local placeholders under `mythosaur-ai/openclaw/templates/skills`.
 Update files here, then restart OpenClaw (`make openclaw-agents`).

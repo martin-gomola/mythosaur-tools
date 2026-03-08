@@ -21,6 +21,7 @@ Shared skill source-of-truth lives here:
 - `skills/shared/agent-browser`
 - `skills/shared/tool-intent-router`
 - `skills/shared/pii-precommit-check`
+- `skills/shared/google-workspace-router`
 
 Skill export path used by local agent environments:
 
@@ -48,7 +49,7 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 | `mythosaur.fetch` | `fetch`, `fetch_json`, `fetch_html`, `download` |
 | `mythosaur.search` | `search`, `search_news`, `search_images` |
 | `mythosaur.filesystem` | `read_file`, `write_file`, `list_directory`, `create_directory`, `delete_file`, `move_file`, `search_files`, `get_file_info` |
-| `mythosaur.google_workspace` | `google_calendar_events`, `gmail_unread`, `google_drive_recent_files`, `google_sheets_read_range` |
+| `mythosaur.google_workspace` | `google_calendar_events`, `google_calendar_create_event`, `gmail_unread`, `gmail_send`, `google_drive_recent_files`, `google_drive_create_folder`, `google_drive_create_text_file`, `google_drive_upload_file`, `google_sheets_read_range`, `google_sheets_write_range`, `google_sheets_append_rows`, `google_sheets_create_sheet`, `google_maps_build_route_link`, `google_maps_build_place_link`, `notebooklm_auth_status`, `notebooklm_list_notebooks`, `notebooklm_query_notebook` |
 | `mythosaur.pii` | `scan_pii_staged`, `scan_pii_repo`, `install_pii_precommit_hook` |
 
 ## Security Defaults
@@ -115,10 +116,44 @@ Env vars:
 
 - `MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE=/data/google-credentials.json`
 - `MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE=/data/google-token.json`
+- `MYTHOSAUR_TOOLS_GOOGLE_*_ENABLED=true|false`
+- `NOTEBOOKLM_MCP_CLI_PATH=/data/notebooklm`
+- `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=default`
 
 Current Google MCP tools:
 
 - `google_calendar_events`
+- `google_calendar_create_event`
 - `gmail_unread`
+- `gmail_send`
 - `google_drive_recent_files`
+- `google_drive_create_folder`
+- `google_drive_create_text_file`
+- `google_drive_upload_file`
 - `google_sheets_read_range`
+- `google_sheets_write_range`
+- `google_sheets_append_rows`
+- `google_sheets_create_sheet`
+- `google_maps_build_route_link`
+- `google_maps_build_place_link`
+- `notebooklm_auth_status`
+- `notebooklm_list_notebooks`
+- `notebooklm_query_notebook`
+
+## NotebookLM Setup
+
+Use the dedicated guide: [docs/notebooklm.md](docs/notebooklm.md)
+
+Short version:
+
+```bash
+cd /path/to/mythosaur-tools
+NOTEBOOKLM_MCP_CLI_PATH="$PWD/data/notebooklm" uv tool run --from notebooklm-mcp-cli nlm login --profile mythosaur
+docker compose up -d --build
+```
+
+For the broader Google write scopes used by Gmail send, Drive upload, and Sheets writes, you may need to refresh the mounted Google token if the existing token was authorized as read-only.
+
+Runtime policy is separate from OAuth scopes. The bot account can hold broad scopes, while `MYTHOSAUR_TOOLS_GOOGLE_*_ENABLED` and `MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED` decide what the runtime is actually allowed to do.
+
+Calendar creation uses its own runtime gate: `MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED`.

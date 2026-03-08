@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 
 from plugins import load_tools
+from plugins.google_workspace_tools import google_capabilities
 
 logging.basicConfig(level=getattr(logging, (os.getenv("LOG_LEVEL") or "INFO").upper(), logging.INFO))
 
@@ -103,6 +104,8 @@ def healthz() -> dict[str, Any]:
             entry["searxng_configured"] = bool(searxng_url)
         if pm.plugin_id == "mythosaur.browser":
             entry["browser_enabled"] = browser_enabled
+        if pm.plugin_id == "mythosaur.google_workspace":
+            entry["capabilities"] = google_capabilities()
         plugins.append(entry)
 
     return {

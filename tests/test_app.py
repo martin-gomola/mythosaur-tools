@@ -49,6 +49,13 @@ class TestHealthz:
         browser_plugin = next(p for p in body["plugins"] if p["plugin_id"] == "mythosaur.browser")
         assert "browser_enabled" in browser_plugin
 
+    def test_google_plugin_shows_capabilities(self, client):
+        resp = client.get("/healthz")
+        body = resp.json()
+        google_plugin = next(p for p in body["plugins"] if p["plugin_id"] == "mythosaur.google_workspace")
+        assert "capabilities" in google_plugin
+        assert "gmail_send" in google_plugin["capabilities"]
+
 
 class TestSchema:
     def test_returns_tools(self, client):
