@@ -4,7 +4,7 @@
 
 .PHONY: help up down restart logs config test commit \
         google-login google-login-ssh notebooklm-login \
-        _check-env
+        notebooklm-login-manual _check-env
 
 DEFAULT_GOAL := help
 
@@ -33,9 +33,10 @@ help:
 	@echo "    make config          Render docker compose config"
 	@echo ""
 	@echo "  Auth:"
-	@echo "    make google-login      Create or refresh Google OAuth and NotebookLM auth"
-	@echo "    make google-login-ssh  Google OAuth via SSH (paste redirect URL manually)"
-	@echo "    make notebooklm-login"
+	@echo "    make google-login            Create or refresh Google OAuth and NotebookLM auth"
+	@echo "    make google-login-ssh        Google OAuth via SSH (paste redirect URL manually)"
+	@echo "    make notebooklm-login        NotebookLM login (launches Chrome)"
+	@echo "    make notebooklm-login-manual NotebookLM login via cookies file (SSH-safe)"
 	@echo ""
 	@echo "  Dev:"
 	@echo "    make test            Run backend tests"
@@ -158,7 +159,18 @@ google-login-ssh: _check-env
 	wait $$bg_pid 2>/dev/null; \
 	echo "  Done. Token written to $$token_path"; \
 	echo ""; \
-	$(MAKE) --no-print-directory notebooklm-login
+	notebooklm_enabled="$$(sed -n 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=//p' .env 2>/dev/null | tail -n 1)"; \
+	notebooklm_enabled="$${notebooklm_enabled:-true}"; \
+	case "$$(printf '%s' "$$notebooklm_enabled" | tr '[:upper:]' '[:lower:]')" in \
+		1|true|yes|on) \
+			echo "  NotebookLM login skipped (requires a browser)."; \
+			echo "  To complete NotebookLM auth, choose one of:"; \
+			echo "    • On a machine with a browser:  make notebooklm-login"; \
+			echo "    • With an exported cookies file: make notebooklm-login-manual COOKIES=path/to/cookies.txt"; \
+			echo ""; \
+			;; \
+		*) ;; \
+	esac
 
 notebooklm-login: _check-env
 	@notebooklm_enabled="$$(sed -n 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=//p' .env 2>/dev/null | tail -n 1)"; \
@@ -179,6 +191,52 @@ notebooklm-login: _check-env
 			echo "Running NotebookLM login for profile $$notebooklm_profile ..."; \
 			NOTEBOOKLM_MCP_CLI_PATH="$$notebooklm_cli_path" \
 				$(UV) tool run --from notebooklm-mcp-cli nlm login --profile "$$notebooklm_profile" \
+			;; \
+		*) \
+			echo "Skipping NotebookLM login (MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=$$notebooklm_enabled)."; \
+			;; \
+	esac
+
+notebooklm-login-manual: _check-env
+	@notebooklm_enabled="$$(sed -n 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=//p' .env 2>/dev/null | tail -n 1)"; \
+	notebooklm_profile="$$(sed -n 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=//p' .env 2>/dev/null | tail -n 1)"; \
+	notebooklm_cli_rel="$$(sed -n 's/^NOTEBOOKLM_MCP_CLI_PATH=//p' .env 2>/dev/null | tail -n 1)"; \
+	notebooklm_enabled="$${notebooklm_enabled:-true}"; \
+	notebooklm_profile="$${notebooklm_profile:-default}"; \
+	notebooklm_cli_rel="$${notebooklm_cli_rel:-/secrets/notebooklm}"; \
+	case "$$notebooklm_cli_rel" in \
+		/secrets/*) notebooklm_cli_path="$(CURDIR)/secrets/$${notebooklm_cli_rel#/secrets/}" ;; \
+		/data/*) notebooklm_cli_path="$(CURDIR)/secrets/$${notebooklm_cli_rel#/data/}" ;; \
+		/*) notebooklm_cli_path="$$notebooklm_cli_rel" ;; \
+		*) notebooklm_cli_path="$(CURDIR)/$$notebooklm_cli_rel" ;; \
+	esac; \
+	cookies_path="$(COOKIES)"; \
+	case "$$(printf '%s' "$$notebooklm_enabled" | tr '[:upper:]' '[:lower:]')" in \
+		1|true|yes|on) \
+			if [ -z "$$cookies_path" ]; then \
+				echo ""; \
+				echo "  NotebookLM manual login — SSH-safe (no browser needed)"; \
+				echo "  ─────────────────────────────────────────────────────"; \
+				echo ""; \
+				echo "  Usage: make notebooklm-login-manual COOKIES=path/to/cookies.txt"; \
+				echo ""; \
+				echo "  To get the cookies file:"; \
+				echo "    1. Open https://notebooklm.google.com in a browser"; \
+				echo "    2. Sign in with the target Google account"; \
+				echo "    3. Export cookies (use a browser extension or DevTools)"; \
+				echo "    4. Save them to a file and pass the path via COOKIES="; \
+				echo ""; \
+				exit 1; \
+			fi; \
+			if [ ! -f "$$cookies_path" ]; then \
+				echo "Cookie file not found: $$cookies_path"; \
+				exit 1; \
+			fi; \
+			mkdir -p "$$notebooklm_cli_path"; \
+			echo "Running NotebookLM manual login for profile $$notebooklm_profile ..."; \
+			NOTEBOOKLM_MCP_CLI_PATH="$$notebooklm_cli_path" \
+				$(UV) tool run --from notebooklm-mcp-cli nlm login \
+				--manual --file "$$cookies_path" --profile "$$notebooklm_profile" \
 			;; \
 		*) \
 			echo "Skipping NotebookLM login (MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=$$notebooklm_enabled)."; \
