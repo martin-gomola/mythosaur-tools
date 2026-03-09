@@ -15,6 +15,12 @@ RUN pip install --no-cache-dir -r /app/requirements.txt \
 
 COPY . /app
 
+RUN addgroup --system --gid 1001 appgroup \
+    && adduser --system --uid 1001 --ingroup appgroup appuser \
+    && chown -R appuser:appgroup /app
+
+USER appuser
+
 EXPOSE 8080
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]

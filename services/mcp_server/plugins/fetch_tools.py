@@ -5,7 +5,7 @@ import json
 import httpx
 from bs4 import BeautifulSoup
 
-from .common import ToolDef, err, now_ms, ok, parse_int, resolve_under_workspace
+from .common import ToolDef, err, now_ms, ok, parse_int, resolve_under_workspace, validate_fetch_url
 
 
 async def _fetch_core(
@@ -39,6 +39,10 @@ async def _fetch(arguments: dict) -> dict:
     url = (arguments.get("url") or "").strip()
     if not url:
         return err("fetch", "missing_url", "url is required", "fetch", started)
+    try:
+        validate_fetch_url(url)
+    except ValueError as exc:
+        return err("fetch", "blocked_url", str(exc), "fetch", started)
     timeout = parse_int(arguments.get("timeout"), default=12, minimum=1, maximum=60)
     max_bytes = parse_int(arguments.get("max_bytes"), default=500_000, minimum=1024, maximum=20_000_000)
     headers = _safe_headers(arguments.get("headers") or {})
@@ -67,6 +71,10 @@ async def _fetch_json(arguments: dict) -> dict:
     url = (arguments.get("url") or "").strip()
     if not url:
         return err("fetch_json", "missing_url", "url is required", "fetch", started)
+    try:
+        validate_fetch_url(url)
+    except ValueError as exc:
+        return err("fetch_json", "blocked_url", str(exc), "fetch", started)
     timeout = parse_int(arguments.get("timeout"), default=12, minimum=1, maximum=60)
     max_bytes = parse_int(arguments.get("max_bytes"), default=1_000_000, minimum=1024, maximum=20_000_000)
     headers = _safe_headers(arguments.get("headers") or {})
@@ -95,6 +103,10 @@ async def _fetch_html(arguments: dict) -> dict:
     url = (arguments.get("url") or "").strip()
     if not url:
         return err("fetch_html", "missing_url", "url is required", "fetch", started)
+    try:
+        validate_fetch_url(url)
+    except ValueError as exc:
+        return err("fetch_html", "blocked_url", str(exc), "fetch", started)
     selector = (arguments.get("selector") or "").strip()
     timeout = parse_int(arguments.get("timeout"), default=12, minimum=1, maximum=60)
     max_bytes = parse_int(arguments.get("max_bytes"), default=1_000_000, minimum=1024, maximum=20_000_000)
@@ -136,6 +148,10 @@ async def _download(arguments: dict) -> dict:
 
     if not url or not path:
         return err("download", "missing_input", "url and path are required", "fetch", started)
+    try:
+        validate_fetch_url(url)
+    except ValueError as exc:
+        return err("download", "blocked_url", str(exc), "fetch", started)
 
     try:
         dst = resolve_under_workspace(path)

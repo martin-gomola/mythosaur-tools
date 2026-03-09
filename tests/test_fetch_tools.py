@@ -63,7 +63,29 @@ def test_download_exists_guard(tmp_path: Path, monkeypatch):
 def test_fetch_invalid_url():
     payload = _run(_tool("fetch").handler({"url": "not-a-url"}))
     assert payload["status"] == "error"
-    assert payload["error"]["code"] == "fetch_failed"
+    assert payload["error"]["code"] == "blocked_url"
+
+
+@pytest.mark.parametrize("url,tool_name", [
+    ("file:///etc/passwd", "fetch"),
+    ("ftp://internal.host/data", "fetch"),
+    ("http://localhost/admin", "fetch"),
+    ("http://127.0.0.1/admin", "fetch"),
+    ("http://10.0.0.1/internal", "fetch"),
+    ("http://192.168.1.1/admin", "fetch_json"),
+    ("http://169.254.169.254/metadata", "fetch_html"),
+])
+def test_fetch_ssrf_blocked(url, tool_name):
+    payload = _run(_tool(tool_name).handler({"url": url}))
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "blocked_url"
+
+
+def test_download_ssrf_blocked(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_WORKSPACE_ROOT", str(tmp_path))
+    payload = _run(_tool("download").handler({"url": "http://127.0.0.1/secret", "path": "out.txt"}))
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "blocked_url"
 
 
 def test_all_fetch_tools_are_async():

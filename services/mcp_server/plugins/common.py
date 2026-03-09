@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Coroutine, Union
+from urllib.parse import urlparse
 
 SyncHandler = Callable[[dict[str, Any]], dict[str, Any]]
 AsyncHandler = Callable[[dict[str, Any]], Coroutine[Any, Any, dict[str, Any]]]
@@ -118,6 +120,43 @@ def resolve_under_base(path_value: str, base_dir: str | Path) -> Path:
     except ValueError as exc:
         raise ValueError(f"path escapes base dir: {path_value}") from exc
     return resolved
+
+
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("0.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.0.0.0/24"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("198.18.0.0/15"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+]
+
+
+def validate_fetch_url(url: str) -> None:
+    """Reject URLs with non-http(s) schemes or targeting private/reserved addresses."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"URL scheme not allowed: {parsed.scheme!r} (only http and https)")
+
+    hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        raise ValueError("URL has no hostname")
+    if hostname in ("localhost", "localhost.localdomain"):
+        raise ValueError("localhost URLs are not allowed")
+
+    try:
+        addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        return  # non-IP hostname (domain name) is fine
+    for net in _BLOCKED_NETWORKS:
+        if addr in net:
+            raise ValueError(f"URL targets a blocked private/reserved network: {addr}")
 
 
 def command_profile() -> str:

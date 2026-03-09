@@ -4,6 +4,7 @@ import base64
 import json
 import mimetypes
 import os
+import threading
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ PHOTOS_WRITE_SCOPES = [
 ]
 _MAPS_DEFAULT_TIMEOUT_SEC = 20
 _PHOTOS_DEFAULT_TIMEOUT_SEC = 20
+_token_refresh_lock = threading.Lock()
 
 _GOOGLE_SCOPE_REQUIREMENTS = {
     "gmail_read": GMAIL_SCOPES,
@@ -73,10 +75,11 @@ def _get_credentials(scopes: list[str]):
         raise FileNotFoundError(
             f"google token file not found: {token_file}. Create an authorized token for the configured scopes."
         )
-    creds = Credentials.from_authorized_user_file(str(token_file), scopes)
-    if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        token_file.write_text(creds.to_json(), encoding="utf-8")
+    with _token_refresh_lock:
+        creds = Credentials.from_authorized_user_file(str(token_file), scopes)
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            token_file.write_text(creds.to_json(), encoding="utf-8")
     if not creds.valid:
         creds_file = _credentials_file()
         raise ValueError(

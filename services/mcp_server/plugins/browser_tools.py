@@ -101,8 +101,10 @@ def _snapshot(args: dict) -> dict:
     started = now_ms()
     if not BROWSER.enabled():
         return _not_enabled("browser_snapshot", started)
+    sess, session_err = _resolve_session("browser_snapshot", args, started)
+    if session_err:
+        return session_err
     try:
-        sess = BROWSER.get(args.get("session_id"), create=False)
         text = sess.page.evaluate("() => document.body ? document.body.innerText : ''")
         text = (text or "").strip()
         max_chars = parse_int(args.get("max_chars"), 8000, 100, 200000)
@@ -125,8 +127,10 @@ def _type(args: dict) -> dict:
     text = str(args.get("text") or "")
     if not selector:
         return err("browser_type", "missing_selector", "selector is required", "browser", started)
+    sess, session_err = _resolve_session("browser_type", args, started)
+    if session_err:
+        return session_err
     try:
-        sess = BROWSER.get(args.get("session_id"), create=False)
         if bool(args.get("clear", True)):
             sess.page.fill(selector, "")
         sess.page.fill(selector, text)
@@ -143,8 +147,10 @@ def _select(args: dict) -> dict:
     value = str(args.get("value") or "")
     if not selector:
         return err("browser_select", "missing_selector", "selector is required", "browser", started)
+    sess, session_err = _resolve_session("browser_select", args, started)
+    if session_err:
+        return session_err
     try:
-        sess = BROWSER.get(args.get("session_id"), create=False)
         sess.page.select_option(selector, value=value)
         return ok("browser_select", {"session_id": sess.session_id, "selector": selector, "value": value}, "browser", started)
     except Exception as exc:
@@ -161,8 +167,10 @@ def _scroll(args: dict) -> dict:
         return _not_enabled("browser_scroll", started)
     x = parse_int(args.get("x"), 0)
     y = parse_int(args.get("y"), 300)
+    sess, session_err = _resolve_session("browser_scroll", args, started)
+    if session_err:
+        return session_err
     try:
-        sess = BROWSER.get(args.get("session_id"), create=False)
         sess.page.mouse.wheel(x, y)
         return ok("browser_scroll", {"session_id": sess.session_id, "x": x, "y": y}, "browser", started)
     except Exception as exc:
@@ -176,8 +184,10 @@ def _press_key(args: dict) -> dict:
     key = (args.get("key") or "").strip()
     if not key:
         return err("browser_press_key", "missing_key", "key is required", "browser", started)
+    sess, session_err = _resolve_session("browser_press_key", args, started)
+    if session_err:
+        return session_err
     try:
-        sess = BROWSER.get(args.get("session_id"), create=False)
         sess.page.keyboard.press(key)
         return ok("browser_press_key", {"session_id": sess.session_id, "key": key}, "browser", started)
     except Exception as exc:
@@ -193,8 +203,10 @@ def _wait_for(args: dict) -> dict:
     state = (args.get("state") or "visible").strip() or "visible"
     if not selector:
         return err("browser_wait_for", "missing_selector", "selector is required", "browser", started)
+    sess, session_err = _resolve_session("browser_wait_for", args, started)
+    if session_err:
+        return session_err
     try:
-        sess = BROWSER.get(args.get("session_id"), create=False)
         sess.page.wait_for_selector(selector, timeout=timeout_ms, state=state)
         return ok("browser_wait_for", {"session_id": sess.session_id, "selector": selector, "state": state}, "browser", started)
     except Exception as exc:
@@ -207,8 +219,10 @@ def _screenshot(args: dict) -> dict:
         return _not_enabled("browser_screenshot", started)
     path = (args.get("path") or "").strip()
     full_page = bool(args.get("full_page", True))
+    sess, session_err = _resolve_session("browser_screenshot", args, started)
+    if session_err:
+        return session_err
     try:
-        sess = BROWSER.get(args.get("session_id"), create=False)
         if path:
             out_path = resolve_under_workspace(path)
             out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -229,12 +243,21 @@ def _execute_script(args: dict) -> dict:
     arg = args.get("arg")
     if not script:
         return err("browser_execute_script", "missing_script", "script is required", "browser", started)
+    sess, session_err = _resolve_session("browser_execute_script", args, started)
+    if session_err:
+        return session_err
     try:
-        sess = BROWSER.get(args.get("session_id"), create=False)
         result = sess.page.evaluate(script, arg)
         return ok("browser_execute_script", {"session_id": sess.session_id, "result": result}, "browser", started)
     except Exception as exc:
         return err("browser_execute_script", "script_failed", str(exc), "browser", started)
+
+
+def _resolve_session(tool_name: str, args: dict, started: int, *, create: bool = False):
+    try:
+        return BROWSER.get(args.get("session_id"), create=create), None
+    except KeyError as exc:
+        return None, err(tool_name, "session_not_found", str(exc), "browser", started)
 
 
 def _with_selector_action(tool_name: str, args: dict, fn) -> dict:
@@ -244,8 +267,10 @@ def _with_selector_action(tool_name: str, args: dict, fn) -> dict:
     selector = (args.get("selector") or "").strip()
     if not selector:
         return err(tool_name, "missing_selector", "selector is required", "browser", started)
+    sess, session_err = _resolve_session(tool_name, args, started)
+    if session_err:
+        return session_err
     try:
-        sess = BROWSER.get(args.get("session_id"), create=False)
         fn(sess.page, selector)
         return ok(tool_name, {"session_id": sess.session_id, "selector": selector}, "browser", started)
     except Exception as exc:

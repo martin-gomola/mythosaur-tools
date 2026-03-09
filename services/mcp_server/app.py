@@ -21,9 +21,12 @@ MCP_PROTOCOL_VERSION = "2024-11-05"
 app = FastAPI(title="mythosaur-tools", version=API_VERSION)
 TOOLS, PLUGINS_META = load_tools()
 SESSIONS: dict[str, dict[str, Any]] = {}
+_SESSION_TTL_SEC = 3600
 _RATE_WINDOW_SEC = 60
 _RATE_MAX_CALLS = int(os.getenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "120"))
 _rate_ledger: dict[str, list[float]] = collections.defaultdict(list)
+_last_cleanup_at = 0.0
+_CLEANUP_INTERVAL_SEC = 300
 _USAGE_LOG_EVERY = int(os.getenv("MYTHOSAUR_TOOLS_USAGE_LOG_EVERY", "5"))
 _USAGE_SUMMARY_INTERVAL_SEC = int(os.getenv("MYTHOSAUR_TOOLS_USAGE_LOG_INTERVAL_SEC", "60"))
 _usage_total_calls = 0
@@ -82,6 +85,24 @@ def _check_rate_limit(key: str) -> None:
             detail=f"rate limit exceeded ({_RATE_MAX_CALLS} calls/{_RATE_WINDOW_SEC}s)",
         )
     _rate_ledger[key].append(now)
+
+
+def _periodic_cleanup() -> None:
+    global _last_cleanup_at
+    now = time.time()
+    if now - _last_cleanup_at < _CLEANUP_INTERVAL_SEC:
+        return
+    _last_cleanup_at = now
+
+    session_cutoff = now - _SESSION_TTL_SEC
+    stale_sids = [sid for sid, data in SESSIONS.items() if data.get("created_at", 0) < session_cutoff]
+    for sid in stale_sids:
+        SESSIONS.pop(sid, None)
+
+    rate_cutoff = now - _RATE_WINDOW_SEC
+    stale_keys = [k for k, ts_list in _rate_ledger.items() if not ts_list or ts_list[-1] < rate_cutoff]
+    for k in stale_keys:
+        _rate_ledger.pop(k, None)
 
 
 def _response(id_value: Any, result: dict[str, Any] | None = None, error: dict[str, Any] | None = None) -> dict:
@@ -178,6 +199,7 @@ async def mcp_endpoint(
 ) -> dict[str, Any]:
     token = _require_auth(authorization)
     _check_rate_limit(token[:8])
+    _periodic_cleanup()
 
     started = time.time()
     payload = await request.json()
