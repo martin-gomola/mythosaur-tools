@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 
 import requests
 
-from .common import ToolDef, err, now_ms, ok, parse_int, resolve_under_workspace
+from .common import ToolDef, bool_env, err, listify_strings, now_ms, ok, parse_int, resolve_under_workspace
 
 GOOGLE_PLUGIN_ID = "mythosaur.google_workspace"
 CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
@@ -92,24 +92,6 @@ def _build_service(name: str, version: str, scopes: list[str]):
     _Request, _Credentials, build = _google_modules()
     creds = _get_credentials(scopes)
     return build(name, version, credentials=creds, cache_discovery=False)
-
-
-def _listify_strings(value: Any) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        return [item.strip() for item in value.split(",") if item.strip()]
-    if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    text = str(value).strip()
-    return [text] if text else []
-
-
-def _bool_env(name: str, default: bool = False) -> bool:
-    raw = (os.getenv(name) or "").strip().lower()
-    if not raw:
-        return default
-    return raw in {"1", "true", "yes", "on"}
 
 
 def _maps_api_key_value() -> str:
@@ -214,20 +196,20 @@ def _maps_link_travel_mode(raw: str) -> str:
 
 def google_capabilities() -> dict[str, bool]:
     return {
-        "calendar_read": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_READ_ENABLED", True),
-        "calendar_write": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED", False),
-        "gmail_read": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_READ_ENABLED", True),
-        "gmail_send": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", False),
-        "drive_read": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_READ_ENABLED", True),
-        "drive_write": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", False),
-        "sheets_read": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_READ_ENABLED", True),
-        "sheets_write": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED", False),
-        "docs_read": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_DOCS_READ_ENABLED", True),
-        "docs_write": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED", False),
-        "photos_read": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_READ_ENABLED", False),
-        "photos_write": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED", False),
-        "notebooklm": _bool_env("MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED", True),
-        "maps": _bool_env("MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED", True),
+        "calendar_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_READ_ENABLED", True),
+        "calendar_write": bool_env("MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED", False),
+        "gmail_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_READ_ENABLED", True),
+        "gmail_send": bool_env("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", False),
+        "drive_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_READ_ENABLED", True),
+        "drive_write": bool_env("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", False),
+        "sheets_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_READ_ENABLED", True),
+        "sheets_write": bool_env("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED", False),
+        "docs_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_DOCS_READ_ENABLED", True),
+        "docs_write": bool_env("MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED", False),
+        "photos_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_READ_ENABLED", False),
+        "photos_write": bool_env("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED", False),
+        "notebooklm": bool_env("MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED", True),
+        "maps": bool_env("MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED", True),
     }
 
 
@@ -366,8 +348,8 @@ def _calendar_create_event(args: dict[str, Any]) -> dict[str, Any]:
     end_time = (args.get("end_time") or "").strip()
     start_date = (args.get("start_date") or "").strip()
     end_date = (args.get("end_date") or "").strip()
-    attendees = _listify_strings(args.get("attendees"))
-    recurrence = _listify_strings(args.get("recurrence"))
+    attendees = listify_strings(args.get("attendees"))
+    recurrence = listify_strings(args.get("recurrence"))
 
     if not summary:
         return err(
@@ -493,9 +475,9 @@ def _gmail_send(args: dict[str, Any]) -> dict[str, Any]:
     blocked = _capability_guard("gmail_send", "gmail_send", started)
     if blocked:
         return blocked
-    to = _listify_strings(args.get("to"))
-    cc = _listify_strings(args.get("cc"))
-    bcc = _listify_strings(args.get("bcc"))
+    to = listify_strings(args.get("to"))
+    cc = listify_strings(args.get("cc"))
+    bcc = listify_strings(args.get("bcc"))
     subject = (args.get("subject") or "").strip()
     body_text = str(args.get("body_text") or "").strip()
     body_html = str(args.get("body_html") or "").strip()
@@ -1066,7 +1048,7 @@ def _maps_build_route_link(args: dict[str, Any]) -> dict[str, Any]:
         )
 
     travel_mode = _maps_link_travel_mode(str(args.get("travel_mode") or "driving"))
-    waypoints = _listify_strings(args.get("waypoints"))
+    waypoints = listify_strings(args.get("waypoints"))
     params = {
         "api": 1,
         "origin": origin,
@@ -1075,7 +1057,7 @@ def _maps_build_route_link(args: dict[str, Any]) -> dict[str, Any]:
     }
     if waypoints:
         params["waypoints"] = "|".join(waypoints)
-    if _bool_env("MYTHOSAUR_TOOLS_GOOGLE_MAPS_NAVIGATE_DEFAULT", False) or bool(args.get("navigate")):
+    if bool_env("MYTHOSAUR_TOOLS_GOOGLE_MAPS_NAVIGATE_DEFAULT", False) or bool(args.get("navigate")):
         params["dir_action"] = "navigate"
     url = "https://www.google.com/maps/dir/?" + urlencode(params)
 
@@ -1221,7 +1203,7 @@ def _maps_compute_route(args: dict[str, Any]) -> dict[str, Any]:
         payload["routingPreference"] = routing_preference.strip().upper()
 
     intermediates = []
-    for waypoint in _listify_strings(args.get("waypoints")):
+    for waypoint in listify_strings(args.get("waypoints")):
         intermediates.append({"address": waypoint})
     if intermediates:
         payload["intermediates"] = intermediates
@@ -1268,13 +1250,13 @@ def _maps_compute_route(args: dict[str, Any]) -> dict[str, Any]:
             "origin": origin,
             "destination": destination,
             "travel_mode": travel_mode,
-            "waypoints": _listify_strings(args.get("waypoints")),
+            "waypoints": listify_strings(args.get("waypoints")),
             "routes": routes,
             "route_link": _maps_build_route_link(
                 {
                     "origin": origin,
                     "destination": destination,
-                    "waypoints": _listify_strings(args.get("waypoints")),
+                    "waypoints": listify_strings(args.get("waypoints")),
                     "travel_mode": _maps_link_travel_mode(travel_mode),
                     "navigate": bool(args.get("navigate")),
                 }
@@ -1518,7 +1500,7 @@ def _photos_add_to_album(args: dict[str, Any]) -> dict[str, Any]:
         return blocked
 
     album_id = (args.get("album_id") or "").strip()
-    media_item_ids = _listify_strings(args.get("media_item_ids"))
+    media_item_ids = listify_strings(args.get("media_item_ids"))
     if not album_id or not media_item_ids:
         return err(
             "google_photos_add_to_album",
@@ -1690,7 +1672,7 @@ def _photos_create_curated_album(args: dict[str, Any]) -> dict[str, Any]:
         return blocked
 
     title = (args.get("title") or "").strip()
-    media_item_ids = _listify_strings(args.get("media_item_ids"))
+    media_item_ids = listify_strings(args.get("media_item_ids"))
     if not title or not media_item_ids:
         return err(
             "google_photos_create_curated_album",

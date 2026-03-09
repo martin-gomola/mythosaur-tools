@@ -388,14 +388,6 @@ def _list_sources(args: dict[str, Any]) -> dict[str, Any]:
 _ALLOWED_SOURCE_TYPES = frozenset({"url", "text", "drive", "file"})
 
 
-def _listify_strings(value: Any) -> list[str]:
-    if isinstance(value, str):
-        return [s.strip() for s in value.split(",") if s.strip()]
-    if isinstance(value, list):
-        return [str(s).strip() for s in value if str(s).strip()]
-    return []
-
-
 def _add_source(args: dict[str, Any]) -> dict[str, Any]:
     started = now_ms()
     blocked = _enabled_guard("notebooklm_add_source", started)

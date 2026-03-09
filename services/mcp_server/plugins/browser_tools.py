@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .common import ToolDef, err, now_ms, ok, parse_int, resolve_under_workspace
+from .common import ToolDef, bool_env, err, now_ms, ok, parse_int, resolve_under_workspace
 
 
 @dataclass
@@ -24,12 +24,7 @@ class BrowserManager:
         self.sessions: dict[str, BrowserSession] = {}
 
     def enabled(self) -> bool:
-        return (os.getenv("MYTHOSAUR_TOOLS_BROWSER_ENABLED") or "false").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
+        return bool_env("MYTHOSAUR_TOOLS_BROWSER_ENABLED", False)
 
     def _create(self, session_id: str | None = None) -> BrowserSession:
         try:
@@ -277,71 +272,50 @@ def _with_selector_action(tool_name: str, args: dict, fn) -> dict:
         return err(tool_name, "action_failed", str(exc), "browser", started)
 
 
-def get_tools() -> list[ToolDef]:
-    obj = {"type": "object", "additionalProperties": False, "properties": {}, "required": []}
+def _schema(properties: dict, required: list[str]) -> dict:
+    return {"type": "object", "additionalProperties": False, "properties": properties, "required": required}
 
+
+def get_tools() -> list[ToolDef]:
     return [
-        ToolDef("browser_navigate", "mythosaur.browser", "Navigate browser to URL.", {
-            **obj,
-            "properties": {
-                "url": {"type": "string"},
-                "session_id": {"type": "string"},
-                "wait_until": {"type": "string", "default": "domcontentloaded"},
-                "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000},
-            },
-            "required": ["url"],
-        }, _navigate, aliases=["osaurus.browser_navigate"]),
-        ToolDef("browser_snapshot", "mythosaur.browser", "Get text snapshot from current page.", {
-            **obj,
-            "properties": {
-                "session_id": {"type": "string"},
-                "max_chars": {"type": "integer", "minimum": 100, "maximum": 200000, "default": 8000},
-            },
-            "required": ["session_id"],
-        }, _snapshot, aliases=["osaurus.browser_snapshot"]),
-        ToolDef("browser_click", "mythosaur.browser", "Click CSS selector.", {
-            **obj,
-            "properties": {"session_id": {"type": "string"}, "selector": {"type": "string"}},
-            "required": ["session_id", "selector"],
-        }, _click, aliases=["osaurus.browser_click"]),
-        ToolDef("browser_type", "mythosaur.browser", "Type into field selector.", {
-            **obj,
-            "properties": {"session_id": {"type": "string"}, "selector": {"type": "string"}, "text": {"type": "string"}, "clear": {"type": "boolean", "default": True}},
-            "required": ["session_id", "selector", "text"],
-        }, _type, aliases=["osaurus.browser_type"]),
-        ToolDef("browser_select", "mythosaur.browser", "Select option by value.", {
-            **obj,
-            "properties": {"session_id": {"type": "string"}, "selector": {"type": "string"}, "value": {"type": "string"}},
-            "required": ["session_id", "selector", "value"],
-        }, _select, aliases=["osaurus.browser_select"]),
-        ToolDef("browser_hover", "mythosaur.browser", "Hover CSS selector.", {
-            **obj,
-            "properties": {"session_id": {"type": "string"}, "selector": {"type": "string"}},
-            "required": ["session_id", "selector"],
-        }, _hover, aliases=["osaurus.browser_hover"]),
-        ToolDef("browser_scroll", "mythosaur.browser", "Scroll page by wheel offsets.", {
-            **obj,
-            "properties": {"session_id": {"type": "string"}, "x": {"type": "integer", "default": 0}, "y": {"type": "integer", "default": 300}},
-            "required": ["session_id"],
-        }, _scroll, aliases=["osaurus.browser_scroll"]),
-        ToolDef("browser_press_key", "mythosaur.browser", "Press keyboard key.", {
-            **obj,
-            "properties": {"session_id": {"type": "string"}, "key": {"type": "string"}},
-            "required": ["session_id", "key"],
-        }, _press_key, aliases=["osaurus.browser_press_key"]),
-        ToolDef("browser_wait_for", "mythosaur.browser", "Wait for selector state.", {
-            **obj,
-            "properties": {"session_id": {"type": "string"}, "selector": {"type": "string"}, "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000, "default": 5000}, "state": {"type": "string", "default": "visible"}},
-            "required": ["session_id", "selector"],
-        }, _wait_for, aliases=["osaurus.browser_wait_for"]),
-        ToolDef("browser_screenshot", "mythosaur.browser", "Take screenshot of current page.", {
-            **obj,
-            "properties": {"session_id": {"type": "string"}, "path": {"type": "string"}, "full_page": {"type": "boolean", "default": True}},
-            "required": ["session_id"],
-        }, _screenshot, aliases=["osaurus.browser_screenshot"]),
-        ToolDef("browser_execute_script", "mythosaur.browser", "Execute page script.", {
-            **obj,
-            "properties": {"session_id": {"type": "string"}, "script": {"type": "string"}, "arg": {}},
-            "required": ["session_id", "script"],
-        }, _execute_script, aliases=["osaurus.browser_execute_script"]),
+        ToolDef("browser_navigate", "mythosaur.browser", "Navigate browser to URL.", _schema({
+            "url": {"type": "string"},
+            "session_id": {"type": "string"},
+            "wait_until": {"type": "string", "default": "domcontentloaded"},
+            "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000},
+        }, ["url"]), _navigate, aliases=["osaurus.browser_navigate"]),
+        ToolDef("browser_snapshot", "mythosaur.browser", "Get text snapshot from current page.", _schema({
+            "session_id": {"type": "string"},
+            "max_chars": {"type": "integer", "minimum": 100, "maximum": 200000, "default": 8000},
+        }, ["session_id"]), _snapshot, aliases=["osaurus.browser_snapshot"]),
+        ToolDef("browser_click", "mythosaur.browser", "Click CSS selector.", _schema({
+            "session_id": {"type": "string"}, "selector": {"type": "string"},
+        }, ["session_id", "selector"]), _click, aliases=["osaurus.browser_click"]),
+        ToolDef("browser_type", "mythosaur.browser", "Type into field selector.", _schema({
+            "session_id": {"type": "string"}, "selector": {"type": "string"}, "text": {"type": "string"},
+            "clear": {"type": "boolean", "default": True},
+        }, ["session_id", "selector", "text"]), _type, aliases=["osaurus.browser_type"]),
+        ToolDef("browser_select", "mythosaur.browser", "Select option by value.", _schema({
+            "session_id": {"type": "string"}, "selector": {"type": "string"}, "value": {"type": "string"},
+        }, ["session_id", "selector", "value"]), _select, aliases=["osaurus.browser_select"]),
+        ToolDef("browser_hover", "mythosaur.browser", "Hover CSS selector.", _schema({
+            "session_id": {"type": "string"}, "selector": {"type": "string"},
+        }, ["session_id", "selector"]), _hover, aliases=["osaurus.browser_hover"]),
+        ToolDef("browser_scroll", "mythosaur.browser", "Scroll page by wheel offsets.", _schema({
+            "session_id": {"type": "string"}, "x": {"type": "integer", "default": 0}, "y": {"type": "integer", "default": 300},
+        }, ["session_id"]), _scroll, aliases=["osaurus.browser_scroll"]),
+        ToolDef("browser_press_key", "mythosaur.browser", "Press keyboard key.", _schema({
+            "session_id": {"type": "string"}, "key": {"type": "string"},
+        }, ["session_id", "key"]), _press_key, aliases=["osaurus.browser_press_key"]),
+        ToolDef("browser_wait_for", "mythosaur.browser", "Wait for selector state.", _schema({
+            "session_id": {"type": "string"}, "selector": {"type": "string"},
+            "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000, "default": 5000},
+            "state": {"type": "string", "default": "visible"},
+        }, ["session_id", "selector"]), _wait_for, aliases=["osaurus.browser_wait_for"]),
+        ToolDef("browser_screenshot", "mythosaur.browser", "Take screenshot of current page.", _schema({
+            "session_id": {"type": "string"}, "path": {"type": "string"}, "full_page": {"type": "boolean", "default": True},
+        }, ["session_id"]), _screenshot, aliases=["osaurus.browser_screenshot"]),
+        ToolDef("browser_execute_script", "mythosaur.browser", "Execute page script.", _schema({
+            "session_id": {"type": "string"}, "script": {"type": "string"}, "arg": {},
+        }, ["session_id", "script"]), _execute_script, aliases=["osaurus.browser_execute_script"]),
     ]

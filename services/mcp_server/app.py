@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 
 from plugins import load_tools
+from plugins.common import ToolDef, bool_env
 from plugins.google_workspace_tools import google_auth_status, google_capabilities
 
 logging.basicConfig(level=getattr(logging, (os.getenv("LOG_LEVEL") or "INFO").upper(), logging.INFO))
@@ -126,9 +127,9 @@ def _to_mcp_content(tool_result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _unique_tools() -> list[dict[str, Any]]:
+def _unique_tools() -> list[ToolDef]:
     seen: set[str] = set()
-    out: list[dict[str, Any]] = []
+    out: list[ToolDef] = []
     for tool in TOOLS.values():
         if tool.name in seen:
             continue
@@ -140,9 +141,7 @@ def _unique_tools() -> list[dict[str, Any]]:
 @app.get("/healthz")
 def healthz() -> dict[str, Any]:
     searxng_url = (os.getenv("MYTHOSAUR_TOOLS_SEARXNG_URL") or "").strip()
-    browser_enabled = (os.getenv("MYTHOSAUR_TOOLS_BROWSER_ENABLED") or "false").strip().lower() in {
-        "1", "true", "yes", "on",
-    }
+    browser_enabled = bool_env("MYTHOSAUR_TOOLS_BROWSER_ENABLED", False)
 
     plugins = []
     for pm in PLUGINS_META:

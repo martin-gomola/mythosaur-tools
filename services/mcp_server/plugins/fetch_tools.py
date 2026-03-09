@@ -34,15 +34,23 @@ def _safe_headers(raw: dict) -> dict[str, str]:
     return out
 
 
-async def _fetch(arguments: dict) -> dict:
-    started = now_ms()
+def _validate_url(tool_name: str, arguments: dict, started: int) -> str | dict:
+    """Extract and validate URL from arguments. Returns url (str) or error result (dict)."""
     url = (arguments.get("url") or "").strip()
     if not url:
-        return err("fetch", "missing_url", "url is required", "fetch", started)
+        return err(tool_name, "missing_url", "url is required", "fetch", started)
     try:
         validate_fetch_url(url)
     except ValueError as exc:
-        return err("fetch", "blocked_url", str(exc), "fetch", started)
+        return err(tool_name, "blocked_url", str(exc), "fetch", started)
+    return url
+
+
+async def _fetch(arguments: dict) -> dict:
+    started = now_ms()
+    url = _validate_url("fetch", arguments, started)
+    if isinstance(url, dict):
+        return url
     timeout = parse_int(arguments.get("timeout"), default=12, minimum=1, maximum=60)
     max_bytes = parse_int(arguments.get("max_bytes"), default=500_000, minimum=1024, maximum=20_000_000)
     headers = _safe_headers(arguments.get("headers") or {})
@@ -68,13 +76,9 @@ async def _fetch(arguments: dict) -> dict:
 
 async def _fetch_json(arguments: dict) -> dict:
     started = now_ms()
-    url = (arguments.get("url") or "").strip()
-    if not url:
-        return err("fetch_json", "missing_url", "url is required", "fetch", started)
-    try:
-        validate_fetch_url(url)
-    except ValueError as exc:
-        return err("fetch_json", "blocked_url", str(exc), "fetch", started)
+    url = _validate_url("fetch_json", arguments, started)
+    if isinstance(url, dict):
+        return url
     timeout = parse_int(arguments.get("timeout"), default=12, minimum=1, maximum=60)
     max_bytes = parse_int(arguments.get("max_bytes"), default=1_000_000, minimum=1024, maximum=20_000_000)
     headers = _safe_headers(arguments.get("headers") or {})
@@ -100,13 +104,9 @@ async def _fetch_json(arguments: dict) -> dict:
 
 async def _fetch_html(arguments: dict) -> dict:
     started = now_ms()
-    url = (arguments.get("url") or "").strip()
-    if not url:
-        return err("fetch_html", "missing_url", "url is required", "fetch", started)
-    try:
-        validate_fetch_url(url)
-    except ValueError as exc:
-        return err("fetch_html", "blocked_url", str(exc), "fetch", started)
+    url = _validate_url("fetch_html", arguments, started)
+    if isinstance(url, dict):
+        return url
     selector = (arguments.get("selector") or "").strip()
     timeout = parse_int(arguments.get("timeout"), default=12, minimum=1, maximum=60)
     max_bytes = parse_int(arguments.get("max_bytes"), default=1_000_000, minimum=1024, maximum=20_000_000)
@@ -140,18 +140,16 @@ async def _fetch_html(arguments: dict) -> dict:
 
 async def _download(arguments: dict) -> dict:
     started = now_ms()
-    url = (arguments.get("url") or "").strip()
+    url_val = (arguments.get("url") or "").strip()
     path = (arguments.get("path") or "").strip()
+    if not url_val or not path:
+        return err("download", "missing_input", "url and path are required", "fetch", started)
+    url = _validate_url("download", arguments, started)
+    if isinstance(url, dict):
+        return url
     overwrite = bool(arguments.get("overwrite", False))
     timeout = parse_int(arguments.get("timeout"), default=20, minimum=1, maximum=120)
     max_bytes = parse_int(arguments.get("max_bytes"), default=20_000_000, minimum=1024, maximum=100_000_000)
-
-    if not url or not path:
-        return err("download", "missing_input", "url and path are required", "fetch", started)
-    try:
-        validate_fetch_url(url)
-    except ValueError as exc:
-        return err("download", "blocked_url", str(exc), "fetch", started)
 
     try:
         dst = resolve_under_workspace(path)

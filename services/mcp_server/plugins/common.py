@@ -76,31 +76,7 @@ def workspace_root() -> Path:
     return Path(raw).resolve()
 
 
-def resolve_under_workspace(path_value: str) -> Path:
-    root = workspace_root()
-    value = (path_value or "").strip()
-    if not value:
-        raise ValueError("path is required")
-    if "\x00" in value:
-        raise ValueError("path contains NUL byte")
-
-    candidate = Path(value)
-    if not candidate.is_absolute():
-        candidate = root / candidate
-
-    resolved = candidate.resolve(strict=False)
-    if resolved == root:
-        return resolved
-
-    try:
-        resolved.relative_to(root)
-    except ValueError as exc:
-        raise ValueError(f"path escapes workspace root: {path_value}") from exc
-    return resolved
-
-
-def resolve_under_base(path_value: str, base_dir: str | Path) -> Path:
-    base = Path(base_dir).resolve()
+def _resolve_path_under(path_value: str, base: Path, escape_message: str) -> Path:
     value = (path_value or "").strip()
     if not value:
         raise ValueError("path is required")
@@ -118,8 +94,24 @@ def resolve_under_base(path_value: str, base_dir: str | Path) -> Path:
     try:
         resolved.relative_to(base)
     except ValueError as exc:
-        raise ValueError(f"path escapes base dir: {path_value}") from exc
+        raise ValueError(escape_message.format(path_value=path_value)) from exc
     return resolved
+
+
+def resolve_under_workspace(path_value: str) -> Path:
+    return _resolve_path_under(
+        path_value,
+        workspace_root(),
+        "path escapes workspace root: {path_value}",
+    )
+
+
+def resolve_under_base(path_value: str, base_dir: str | Path) -> Path:
+    return _resolve_path_under(
+        path_value,
+        Path(base_dir).resolve(),
+        "path escapes base dir: {path_value}",
+    )
 
 
 _BLOCKED_NETWORKS = [
@@ -165,3 +157,23 @@ def command_profile() -> str:
 
 def is_readonly() -> bool:
     return command_profile() != "power"
+
+
+def bool_env(name: str, default: bool = False) -> bool:
+    """Parse a boolean from an environment variable (1, true, yes, on)."""
+    raw = (os.getenv(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
+def listify_strings(value: Any) -> list[str]:
+    """Convert a string (comma-separated), list, or single value to a list of non-empty strings."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value).strip()
+    return [text] if text else []
