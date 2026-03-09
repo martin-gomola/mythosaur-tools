@@ -12,7 +12,7 @@ from fastapi import FastAPI, Header, HTTPException, Request, Response
 
 from plugins import load_tools
 from plugins.common import ToolDef, bool_env
-from plugins.google_workspace_tools import google_auth_status, google_capabilities
+from plugins.google_tools import google_auth_status, google_capabilities
 
 logging.basicConfig(level=getattr(logging, (os.getenv("LOG_LEVEL") or "INFO").upper(), logging.INFO))
 
