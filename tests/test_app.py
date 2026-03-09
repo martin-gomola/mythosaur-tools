@@ -60,6 +60,8 @@ class TestHealthz:
         assert "gmail_send" in google_plugin["capabilities"]
         assert "auth" in google_plugin
         assert "granted_scopes" in google_plugin["auth"]
+        assert "service_checks" in google_plugin["auth"]
+        assert "maps" in google_plugin["auth"]["service_checks"]
 
 
 class TestSchema:

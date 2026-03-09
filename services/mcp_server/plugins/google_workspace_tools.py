@@ -121,6 +121,18 @@ def _maps_api_key_value() -> str:
     return ""
 
 
+def _google_service_checks() -> dict[str, dict[str, Any]]:
+    maps_api_key = _maps_api_key_value()
+    return {
+        "maps": {
+            "auth_type": "api_key",
+            "configured": bool(maps_api_key),
+            "required_config": ["GOOGLE_MAPS_API_KEY"],
+            "missing_config": [] if maps_api_key else ["GOOGLE_MAPS_API_KEY"],
+        }
+    }
+
+
 def _maps_api_guard(tool_name: str, started: int) -> dict[str, Any] | None:
     if _maps_api_key_value():
         return None
@@ -218,12 +230,14 @@ def google_capabilities() -> dict[str, bool]:
 
 def google_auth_status() -> dict[str, Any]:
     token_file = _token_file()
+    service_checks = _google_service_checks()
     if not token_file.exists():
         return {
             "token_file": str(token_file),
             "token_present": False,
             "granted_scopes": [],
             "scope_checks": {},
+            "service_checks": service_checks,
         }
 
     try:
@@ -234,6 +248,7 @@ def google_auth_status() -> dict[str, Any]:
             "token_present": True,
             "granted_scopes": [],
             "scope_checks": {},
+            "service_checks": service_checks,
             "error": f"invalid token file: {exc}",
         }
 
@@ -260,6 +275,7 @@ def google_auth_status() -> dict[str, Any]:
         "token_present": True,
         "granted_scopes": granted_scopes,
         "scope_checks": checks,
+        "service_checks": service_checks,
     }
 
 

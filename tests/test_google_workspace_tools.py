@@ -548,6 +548,18 @@ def test_google_maps_api_tools_require_key(monkeypatch):
     assert result["error"]["code"] == "maps_api_key_missing"
 
 
+def test_google_auth_status_includes_maps_service_check(monkeypatch, tmp_path):
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE", str(tmp_path / "missing-token.json"))
+    monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "maps-key")
+
+    result = google_tools.google_auth_status()
+
+    assert result["token_present"] is False
+    assert result["service_checks"]["maps"]["auth_type"] == "api_key"
+    assert result["service_checks"]["maps"]["configured"] is True
+    assert result["service_checks"]["maps"]["missing_config"] == []
+
+
 def test_google_photos_create_album(monkeypatch):
     monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED", "true")
     monkeypatch.setattr(google_tools, "_get_credentials", lambda scopes: _FakeCreds())
