@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 from pathlib import Path
 
 from google.auth.exceptions import RefreshError
@@ -35,6 +37,15 @@ SCOPE_PRESETS = {
     "readonly": READONLY_SCOPES,
     "workspace": WORKSPACE_SCOPES,
 }
+
+
+_GOOGLE_SCOPE_PREFIX = "https://www.googleapis.com/auth/"
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def _write_token(token_path: Path, data: str) -> None:
+    token_path.write_text(data, encoding="utf-8")
+    os.chmod(token_path, stat.S_IRUSR | stat.S_IWUSR)
 
 
 def _dedupe(items: list[str]) -> list[str]:
@@ -120,7 +131,7 @@ def _load_existing_token(token_path: Path, scopes: list[str]) -> Credentials | N
     if creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
-            token_path.write_text(creds.to_json(), encoding="utf-8")
+            _write_token(token_path, creds.to_json())
         except RefreshError as exc:
             message = str(exc)
             if "invalid_scope" in message:
@@ -146,6 +157,18 @@ def main() -> int:
     args = _parse_args()
     credentials_path = Path(args.credentials).expanduser().resolve(strict=False)
     token_path = Path(args.token).expanduser().resolve(strict=False)
+
+    for scope in args.scope:
+        if not scope.startswith(_GOOGLE_SCOPE_PREFIX):
+            raise SystemExit(
+                f"Invalid scope (must start with {_GOOGLE_SCOPE_PREFIX}): {scope}"
+            )
+
+    if args.host not in _LOOPBACK_HOSTS:
+        raise SystemExit(
+            f"Refusing to bind OAuth callback to non-loopback address: {args.host}"
+        )
+
     scopes = _dedupe([*SCOPE_PRESETS[args.preset], *args.scope])
 
     if not credentials_path.exists():
@@ -170,10 +193,10 @@ def main() -> int:
         access_type="offline",
         prompt="consent",
     )
-    token_path.write_text(creds.to_json(), encoding="utf-8")
+    _write_token(token_path, creds.to_json())
 
     print(f"Wrote token: {token_path}")
-    print(f"Credentials: {credentials_path}")
+    print(f"Credentials: {credentials_path.name}")
     print(f"Scopes: {', '.join(scopes)}")
     return 0
 
