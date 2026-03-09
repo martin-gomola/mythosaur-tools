@@ -11,6 +11,12 @@ This guide connects NotebookLM to `mythosaur-tools` using the dedicated Mythosau
   - `notebooklm_auth_status`
   - `notebooklm_list_notebooks`
   - `notebooklm_query_notebook`
+  - `notebooklm_create_notebook`
+  - `notebooklm_list_sources`
+  - `notebooklm_add_source`
+  - `notebooklm_create_studio_content`
+  - `notebooklm_download_artifact`
+  - `notebooklm_share`
 
 ## One-Time Setup
 
@@ -91,6 +97,78 @@ curl -sS -X POST "$MCP_URL" \
   -H "Authorization: Bearer $API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"notebooklm_query_notebook","arguments":{"profile":"mythosaur","notebook_id":"NOTEBOOK_ID","question":"What are the three key takeaways?"}}}' | jq
+```
+
+## Tool Reference
+
+### notebooklm_create_notebook
+
+Create a new notebook:
+
+```bash
+curl -sS -X POST "$MCP_URL" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"notebooklm_create_notebook","arguments":{"title":"My Research"}}}' | jq
+```
+
+### notebooklm_list_sources
+
+List sources in a notebook:
+
+```bash
+curl -sS -X POST "$MCP_URL" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"notebooklm_list_sources","arguments":{"notebook_id":"NOTEBOOK_ID"}}}' | jq
+```
+
+### notebooklm_add_source
+
+Add a URL, text, Google Drive file, or local file as a source:
+
+```bash
+curl -sS -X POST "$MCP_URL" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"notebooklm_add_source","arguments":{"notebook_id":"NOTEBOOK_ID","source_type":"url","source_value":"https://example.com/article"}}}' | jq
+```
+
+Supported `source_type` values: `url`, `text`, `drive`, `file`.
+
+### notebooklm_create_studio_content
+
+Generate studio content (podcast, video, mind map, infographic, slides, briefing):
+
+```bash
+curl -sS -X POST "$MCP_URL" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"notebooklm_create_studio_content","arguments":{"notebook_id":"NOTEBOOK_ID","content_type":"audio","instructions":"Focus on key findings"}}}' | jq
+```
+
+Supported `content_type` values: `audio`, `video`, `mindmap`, `infographic`, `slides`, `briefing`.
+
+### notebooklm_download_artifact
+
+Download a generated artifact:
+
+```bash
+curl -sS -X POST "$MCP_URL" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"notebooklm_download_artifact","arguments":{"notebook_id":"NOTEBOOK_ID","artifact_id":"ARTIFACT_ID","artifact_type":"audio"}}}' | jq
+```
+
+### notebooklm_share
+
+Share a notebook publicly or via invite link:
+
+```bash
+curl -sS -X POST "$MCP_URL" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"notebooklm_share","arguments":{"notebook_id":"NOTEBOOK_ID","share_type":"public"}}}' | jq
 ```
 
 ## Files Used

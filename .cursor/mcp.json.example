@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "mythosaur-tools": {
+      "url": "http://127.0.0.1:8064/mcp",
+      "headers": {
+        "Authorization": "Bearer replace-with-strong-token"
+      }
+    }
+  }
+}

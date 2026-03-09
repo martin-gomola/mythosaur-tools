@@ -291,6 +291,12 @@ Available tools:
 - `notebooklm_auth_status`
 - `notebooklm_list_notebooks`
 - `notebooklm_query_notebook`
+- `notebooklm_create_notebook`
+- `notebooklm_list_sources`
+- `notebooklm_add_source`
+- `notebooklm_create_studio_content`
+- `notebooklm_download_artifact`
+- `notebooklm_share`
 
 NotebookLM operator guide:
 
@@ -402,6 +408,66 @@ Path safety helpers in `plugins/common.py` support both workspace-root and arbit
 
 Plugins can provide async handlers by setting `is_async=True` on the `ToolDef`. Sync handlers
 are automatically offloaded to a thread pool via `asyncio.to_thread`.
+
+---
+
+## Consumer Integration Patterns
+
+### mythosaur-ai
+
+mythosaur-ai is the primary consumer. Its Makefile auto-starts this stack on `make up`:
+
+1. Checks for `../mythosaur-tools/docker-compose.yml`
+2. If `MYTHOSAUR_TOOLS_AUTOSTART=true` (default), starts this stack
+3. Injects its own `WORKSPACE_DIR` as `MYTHOSAUR_TOOLS_WORKSPACE_HOST` so tools operate on the same workspace
+4. Nanobot sends `tools/call` requests to `MYTHOSAUR_TOOLS_MCP_URL`
+
+After changing tools, run `make tools-refresh` from mythosaur-ai to rebuild this stack and restart Nanobot.
+
+Auth flows (Google OAuth, NotebookLM login) run from this repo because it owns `secrets/`.
+mythosaur-ai's `make google-login` delegates here.
+
+### Cursor IDE
+
+Cursor connects via `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "mythosaur-tools": {
+      "url": "http://127.0.0.1:8064/mcp",
+      "headers": {
+        "Authorization": "Bearer <MYTHOSAUR_TOOLS_API_KEY>"
+      }
+    }
+  }
+}
+```
+
+Set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` in `.env` to the project Cursor should operate on.
+Restart the stack and Cursor after changes.
+
+### Any MCP Client
+
+Any tool that speaks MCP over HTTP can connect:
+
+1. Start the stack: `docker compose up -d --build`
+2. `POST /mcp` with `Authorization: Bearer <token>` and `Content-Type: application/json`
+3. Send `initialize`, then `tools/list` to discover tools, then `tools/call` to invoke
+4. Parse the tool result envelope (`status`, `data`, `error`, `meta`)
+
+The `/schema` endpoint exports all tool definitions without auth for client code generation.
+
+### Shared Skills
+
+Skills in `skills/shared/` are the routing layer that consumers embed. They decide *when* to call
+a tool and *how* to interpret the result. The tool handlers here are the execution layer.
+
+Export skills to a consumer:
+
+```bash
+./scripts/export-skills.sh /path/to/consumer/skills
+```
 
 ---
 

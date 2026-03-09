@@ -41,6 +41,12 @@ Use this skill for requests backed by the Google and NotebookLM tools in `mythos
 - NotebookLM auth check -> `notebooklm_auth_status`
 - NotebookLM notebook discovery -> `notebooklm_list_notebooks`
 - NotebookLM grounded Q&A -> `notebooklm_query_notebook`
+- NotebookLM create notebook -> `notebooklm_create_notebook`
+- NotebookLM list sources -> `notebooklm_list_sources`
+- NotebookLM add source -> `notebooklm_add_source`
+- NotebookLM generate content -> `notebooklm_create_studio_content`
+- NotebookLM download artifact -> `notebooklm_download_artifact`
+- NotebookLM share notebook -> `notebooklm_share`
 
 ## Routing Rules
 
@@ -68,6 +74,10 @@ Use this skill for requests backed by the Google and NotebookLM tools in `mythos
 2. For NotebookLM:
    - use `notebooklm_list_notebooks` first if the notebook is not clearly identified
    - use `notebooklm_query_notebook` only after you know the target notebook
+   - use `notebooklm_create_notebook` + `notebooklm_add_source` to build a knowledge base
+   - use `notebooklm_create_studio_content` to generate podcasts, mind maps, slides, etc.
+   - use `notebooklm_download_artifact` to retrieve generated content
+   - use `notebooklm_share` to make notebooks accessible via public or invite link
 3. Do not guess. If the tool does not return the answer, say the data is missing or unavailable.
 4. If the user asks for a write action that is not yet implemented, say so clearly instead of improvising.
 
@@ -75,7 +85,6 @@ Use this skill for requests backed by the Google and NotebookLM tools in `mythos
 
 These actions are planned but not currently exposed through `mythosaur-tools`:
 
-- creating or updating NotebookLM notebooks and sources
 - moving or deleting Drive files
 - Gmail draft creation
 - full-library duplicate scanning across the user's entire personal Google Photos library

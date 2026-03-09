@@ -49,7 +49,7 @@ Export same shared skills for local IDE/dev agent stacks (Codex, Cursor, other r
 | `mythosaur.fetch` | `fetch`, `fetch_json`, `fetch_html`, `download` |
 | `mythosaur.search` | `search`, `search_news`, `search_images` |
 | `mythosaur.filesystem` | `read_file`, `write_file`, `list_directory`, `create_directory`, `delete_file`, `move_file`, `search_files`, `get_file_info` |
-| `mythosaur.google_workspace` | `google_calendar_events`, `google_calendar_create_event`, `gmail_unread`, `gmail_send`, `google_drive_recent_files`, `google_drive_create_folder`, `google_drive_create_text_file`, `google_drive_upload_file`, `google_sheets_read_range`, `google_sheets_write_range`, `google_sheets_append_rows`, `google_sheets_create_sheet`, `google_docs_get`, `google_docs_create`, `google_photos_list_albums`, `google_photos_create_album`, `google_photos_list_media_items`, `google_photos_upload_file`, `google_photos_add_to_album`, `google_photos_find_duplicate_candidates`, `google_photos_create_curated_album`, `google_maps_build_route_link`, `google_maps_build_place_link`, `google_maps_search_places`, `google_maps_compute_route`, `notebooklm_auth_status`, `notebooklm_list_notebooks`, `notebooklm_query_notebook` |
+| `mythosaur.google_workspace` | `google_calendar_events`, `google_calendar_create_event`, `gmail_unread`, `gmail_send`, `google_drive_recent_files`, `google_drive_create_folder`, `google_drive_create_text_file`, `google_drive_upload_file`, `google_sheets_read_range`, `google_sheets_write_range`, `google_sheets_append_rows`, `google_sheets_create_sheet`, `google_docs_get`, `google_docs_create`, `google_photos_list_albums`, `google_photos_create_album`, `google_photos_list_media_items`, `google_photos_upload_file`, `google_photos_add_to_album`, `google_photos_find_duplicate_candidates`, `google_photos_create_curated_album`, `google_maps_build_route_link`, `google_maps_build_place_link`, `google_maps_search_places`, `google_maps_compute_route`, `notebooklm_auth_status`, `notebooklm_list_notebooks`, `notebooklm_query_notebook`, `notebooklm_create_notebook`, `notebooklm_list_sources`, `notebooklm_add_source`, `notebooklm_create_studio_content`, `notebooklm_download_artifact`, `notebooklm_share` |
 | `mythosaur.pii` | `scan_pii_staged`, `scan_pii_repo`, `install_pii_precommit_hook` |
 
 ## Security Defaults
@@ -81,6 +81,29 @@ cp .env.example .env
 docker compose up -d --build
 curl -s http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}/healthz | jq
 ```
+
+## Connect to Cursor
+
+1. **Start the MCP server** (if not already running):
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. **Configure Cursor MCP (token stays local)**  
+   Copy the example and set your API key. `.cursor/mcp.json` is gitignored so your token is never committed.
+   ```bash
+   cp .cursor/mcp.json.example .cursor/mcp.json
+   ```
+   Edit `.cursor/mcp.json` and replace `replace-with-strong-token` in the `Authorization` header with the same value as `MYTHOSAUR_TOOLS_API_KEY` in your `.env`.
+
+3. **Restart Cursor** so it picks up the MCP server.
+
+4. **Verify**  
+   Open **Settings → Tools & MCP**. You should see `mythosaur-tools`; enable it if needed. Agent can then use the tools when you chat.
+
+If you use a different MCP port, change the `url` in `.cursor/mcp.json` (e.g. `http://127.0.0.1:8064/mcp` → your port).
+
+**Workspace (standalone):** The MCP tools (read_file, git_*, etc.) only see the directory mounted as the workspace. In `.env`, `MYTHOSAUR_TOOLS_WORKSPACE_HOST` controls that. For standalone Cursor use, set it to `.` (this repo) or to the **path of the project you have open in Cursor** so the tools operate on the right files. Restart the stack after changing it.
 
 ## MCP Smoke Test
 

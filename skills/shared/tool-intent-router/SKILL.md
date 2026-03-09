@@ -43,6 +43,8 @@ metadata: {"openclaw":{"always":true}}
   `browser_type`, `browser_select`, `browser_hover`, `browser_scroll`,
   `browser_press_key`, `browser_wait_for`, `browser_screenshot`,
   `browser_execute_script`
+- `google` -> see `google-workspace-router` skill for the full Google/NotebookLM tool map
+- `pii` -> `scan_pii_staged`, `scan_pii_repo`, `install_pii_precommit_hook`
 
 ## Call Format
 
