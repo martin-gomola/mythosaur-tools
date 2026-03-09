@@ -1,10 +1,11 @@
 ---
 name: context7
 description: >
-  Retrieve current library/framework documentation and API examples via
-  Context7 MCP when accuracy depends on latest docs.
-allowed-tools: Bash(curl:*)
-metadata: {"openclaw":{"requires":{"bins":[]}}}
+  Retrieve current library and framework documentation and API examples via
+  Context7 MCP. Use when writing or reviewing code that depends on a specific
+  library version and the agent needs current API docs, usage examples, or
+  migration guides. Triggers on requests like "show me the latest React docs",
+  "how does useEffect work in React 19", or "what changed in Express 5".
 ---
 
 # Context7
@@ -17,8 +18,8 @@ metadata: {"openclaw":{"requires":{"bins":[]}}}
 
 ## Workflow
 
-Wrapper: `$HOME/.openclaw/skills/context7/scripts/context7.sh`
-Alias below as `c7` for brevity.
+The wrapper script is bundled at `scripts/context7.sh` (relative to this skill directory).
+The consumer runtime determines the absolute path. Alias as `c7` for brevity.
 
 ### 1. Resolve the library ID
 

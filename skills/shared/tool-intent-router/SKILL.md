@@ -2,11 +2,9 @@
 name: tool-intent-router
 description: >
   Decide the minimal MCP tool call for a user request and call only what is
-  needed through mythosaur_tool_call. Use for requests that may need time/date,
-  search, fetch, git, browser, or filesystem data. Skip tool calls for normal
-  conversational replies.
-allowed-tools: Bash(curl:*)
-metadata: {"openclaw":{"always":true}}
+  needed. Use for requests that may need time/date, search, fetch, git, browser,
+  filesystem, Google Workspace, NotebookLM, Maps, Photos, or PII scanning.
+  Skip tool calls for normal conversational replies.
 ---
 
 # Tool Intent Router
@@ -27,8 +25,10 @@ metadata: {"openclaw":{"always":true}}
    - `git`: repository state/history/diff/branch.
    - `filesystem`: workspace file/directory read operations.
    - `browser`: interactive page actions/snapshots/screenshots.
+   - `google`: calendar, email, drive, sheets, docs, photos, maps, notebooklm.
+   - `pii`: scan staged files or repos for sensitive data.
 2. If `chat_only`, answer directly without tool calls.
-3. If tool is needed, call exactly one MCP tool first via `mythosaur_tool_call`.
+3. If tool is needed, call exactly one MCP tool first.
 4. Call additional tools only when prior output proves it is required.
 5. If request is ambiguous, ask one short clarification instead of broad tool fan-out.
 
@@ -48,13 +48,12 @@ metadata: {"openclaw":{"always":true}}
 
 ## Call Format
 
-Use the generic wrapper:
+How tools are invoked depends on the consumer runtime:
 
-```json
-{"name":"mythosaur_tool_call","args":{"name":"<mcp_tool_name>","args":{...}}}
-```
+- **Nanobot (mythosaur-ai)**: use the `mythosaur_tool_call` wrapper.
+- **Cursor / direct MCP clients**: call tools by name via `tools/call`.
 
-Examples:
+Nanobot example:
 
 ```json
 {"name":"mythosaur_tool_call","args":{"name":"current_time","args":{"timezone":"Europe/Bratislava"}}}

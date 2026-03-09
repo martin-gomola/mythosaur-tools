@@ -1,15 +1,14 @@
 ---
 name: pii-precommit-check
-description: Run shared PII scan tools before commits, interpret findings, and block commit progress until sensitive values are redacted or parameterized.
+description: >
+  Run shared PII scan tools before commits, interpret findings, and block
+  commit progress until sensitive values are redacted or parameterized. Use
+  before creating a commit, when reviewing staged changes for secrets, emails,
+  local home paths, tokens, or auth files, or when installing local pre-commit
+  protection for a repo.
 ---
 
 # pii-precommit-check
-
-## When to use
-
-- Before creating a commit
-- When reviewing staged changes for secrets, emails, local home paths, tokens, or auth files
-- When installing local pre-commit protection for the current repo
 
 ## Workflow
 
