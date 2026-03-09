@@ -50,10 +50,10 @@ description: >
 
 How tools are invoked depends on the consumer runtime:
 
-- **Nanobot (mythosaur-ai)**: use the `mythosaur_tool_call` wrapper.
-- **Cursor / direct MCP clients**: call tools by name via `tools/call`.
+- **mythosaur-ai**: use the repo's MCP wrapper if that runtime exposes one.
+- **Codex / Cursor / Claude Code / direct MCP clients**: call tools by name via `tools/call`.
 
-Nanobot example:
+mythosaur-ai wrapper example:
 
 ```json
 {"name":"mythosaur_tool_call","args":{"name":"current_time","args":{"timezone":"Europe/Bratislava"}}}

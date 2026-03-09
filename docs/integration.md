@@ -415,14 +415,14 @@ are automatically offloaded to a thread pool via `asyncio.to_thread`.
 
 ### mythosaur-ai
 
-mythosaur-ai is the primary consumer. Its Makefile auto-starts this stack on `make up`:
+mythosaur-ai is one consumer of this stack. Its Makefile can auto-start the stack on `make up`:
 
 1. Checks for `../mythosaur-tools/docker-compose.yml`
 2. If `MYTHOSAUR_TOOLS_AUTOSTART=true` (default), starts this stack
 3. Injects its own `WORKSPACE_DIR` as `MYTHOSAUR_TOOLS_WORKSPACE_HOST` so tools operate on the same workspace
-4. Nanobot sends `tools/call` requests to `MYTHOSAUR_TOOLS_MCP_URL`
+4. mythosaur-ai sends `tools/call` requests to `MYTHOSAUR_TOOLS_MCP_URL`
 
-After changing tools, run `make tools-refresh` from mythosaur-ai to rebuild this stack and restart Nanobot.
+After changing tools, run `make tools-refresh` from mythosaur-ai to rebuild this stack and refresh its tool catalog.
 
 Auth flows (Google OAuth, NotebookLM login) run from this repo because it owns `secrets/`.
 mythosaur-ai's `make google-login` delegates here.
@@ -446,6 +446,16 @@ Cursor connects via `.cursor/mcp.json`:
 
 Set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` in `.env` to the project Cursor should operate on.
 Restart the stack and Cursor after changes.
+
+### Codex / Claude Code
+
+Codex and Claude Code can connect to the same HTTP MCP endpoint:
+
+1. Start this stack with `docker compose up -d --build`
+2. Configure the client to use `http://127.0.0.1:8064/mcp`
+3. Send `Authorization: Bearer <MYTHOSAUR_TOOLS_API_KEY>`
+4. Set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` in `.env` to the target project path
+5. Restart the stack after tool changes so the client reloads the catalog
 
 ### Any MCP Client
 

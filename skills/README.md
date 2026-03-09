@@ -1,17 +1,19 @@
 # Skills (Central Source)
 
-`mythosaur-tools` is the source-of-truth for shared skills used across bots and local agent runtimes.
+`mythosaur-tools` is the source of truth for shared skills used across agent runtimes and consumers.
 
 - Shared source path: `skills/shared/`
-- OpenClaw consumer mount path (in `mythosaur-ai`): `/opt/openclaw-templates/skills`
 - Optional local export helper: `scripts/export-skills.sh`
 
 Current shared skills:
 - `context7`
 - `agent-browser`
+- `architect`
+- `code-quality`
+- `python-patterns`
+- `refactor-cleaner`
 - `tool-intent-router`
 - `pii-precommit-check`
 - `google-workspace-router`
 
-Do not edit local placeholders under `mythosaur-ai/openclaw/templates/skills`.
-Update files here, then restart OpenClaw (`make openclaw-agents`).
+Update shared skills in this directory. Consumers should sync or reload them using their own runtime-specific workflow.

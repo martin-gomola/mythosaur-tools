@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Handoff document for AI coding assistants working in or consuming `mythosaur-tools`.
 Read this first. For protocol details, see `docs/integration.md`.
