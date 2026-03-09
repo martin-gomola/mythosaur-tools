@@ -35,7 +35,7 @@ services:
     restart: unless-stopped
 
   searxng:
-    image: searxng/searxng:2026.2.28-a2108ce2e
+    image: searxng/searxng:latest
     container_name: mythosaur-tools-searxng
     environment:
       BASE_URL: http://searxng-cache:8080
