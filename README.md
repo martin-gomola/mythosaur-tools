@@ -4,6 +4,12 @@ Shared MCP tool services and shared skill sources for Mythosaur bots and UIs.
 
 This repository keeps tool backends and managed skill sources separate from `mythosaur-ai`, so orchestration/chat runtime and shared capabilities can evolve independently.
 
+## Runtime Boundary
+
+- Shared in `mythosaur-tools`: search, fetch, browser, Google Workspace, and PII.
+- Kept local in `mythosaur-ai`: filesystem read/write/edit for the active workspace, local git operations, message delivery, cron, session/memory management, deterministic intents, and lane orchestration.
+- Reason: network/API capabilities benefit from one shared MCP implementation, while direct workspace mutation is more reliable when it happens in the local runtime instead of through Docker-mounted writes.
+
 ## What This Provides
 
 - MCP HTTP endpoint: `/mcp`

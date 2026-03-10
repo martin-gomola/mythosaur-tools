@@ -4,11 +4,14 @@ import importlib
 import logging
 import pkgutil
 from dataclasses import dataclass
-from typing import Any
+from types import ModuleType
+from typing import Callable, Final
 
 from .common import ToolDef
 
 logger = logging.getLogger(__name__)
+PLUGIN_MODULE_SUFFIX: Final = "_tools"
+DEFAULT_PACKAGE_NAME: Final = "plugins"
 
 
 @dataclass
@@ -16,6 +19,51 @@ class PluginMeta:
     plugin_id: str
     tool_count: int
     tool_names: list[str]
+
+
+def _plugin_module_names() -> list[str]:
+    package_path = __path__
+    return sorted(
+        module_name
+        for _, module_name, _ in pkgutil.iter_modules(package_path)
+        if module_name.endswith(PLUGIN_MODULE_SUFFIX)
+    )
+
+
+def _import_plugin_module(package_name: str, module_name: str) -> ModuleType | None:
+    module_fqn = f"{package_name}.{module_name}"
+    try:
+        return importlib.import_module(module_fqn)
+    except Exception:
+        logger.exception("failed to import plugin module %s", module_fqn)
+        return None
+
+
+def _plugin_tools(module: ModuleType, package_name: str) -> list[ToolDef]:
+    module_fqn = f"{package_name}.{module.__name__.split('.')[-1]}"
+    get_tools_fn = getattr(module, "get_tools", None)
+    if not callable(get_tools_fn):
+        logger.warning("module %s has no get_tools() callable, skipping", module_fqn)
+        return []
+
+    try:
+        return get_tools_fn()
+    except Exception:
+        logger.exception("get_tools() failed in %s", module_fqn)
+        return []
+
+
+def _register_tool(tool_map: dict[str, ToolDef], tool: ToolDef) -> None:
+    tool_map[tool.name] = tool
+    for alias in tool.aliases or []:
+        tool_map[alias] = tool
+
+
+def _plugin_metadata(seen_plugins: dict[str, list[str]]) -> list[PluginMeta]:
+    return [
+        PluginMeta(plugin_id=plugin_id, tool_count=len(names), tool_names=names)
+        for plugin_id, names in seen_plugins.items()
+    ]
 
 
 def load_tools() -> tuple[dict[str, ToolDef], list[PluginMeta]]:
@@ -28,41 +76,18 @@ def load_tools() -> tuple[dict[str, ToolDef], list[PluginMeta]]:
     plugins_meta: list[PluginMeta] = []
     seen_plugins: dict[str, list[str]] = {}
 
-    package = __package__ or "plugins"
-    pkg_path = __path__
+    package_name = __package__ or DEFAULT_PACKAGE_NAME
 
-    for finder, module_name, _is_pkg in pkgutil.iter_modules(pkg_path):
-        if not module_name.endswith("_tools"):
+    for module_name in _plugin_module_names():
+        module = _import_plugin_module(package_name, module_name)
+        if module is None:
             continue
 
-        fqn = f"{package}.{module_name}"
-        try:
-            mod = importlib.import_module(fqn)
-        except Exception:
-            logger.exception("failed to import plugin module %s", fqn)
-            continue
+        for tool in _plugin_tools(module, package_name):
+            _register_tool(tools, tool)
+            seen_plugins.setdefault(tool.plugin_id, []).append(tool.name)
 
-        get_tools_fn = getattr(mod, "get_tools", None)
-        if not callable(get_tools_fn):
-            logger.warning("module %s has no get_tools() callable, skipping", fqn)
-            continue
-
-        try:
-            plugin_tools = get_tools_fn()
-        except Exception:
-            logger.exception("get_tools() failed in %s", fqn)
-            continue
-
-        for tool in plugin_tools:
-            tools[tool.name] = tool
-            for alias in tool.aliases or []:
-                tools[alias] = tool
-
-            pid = tool.plugin_id
-            seen_plugins.setdefault(pid, []).append(tool.name)
-
-    for pid, names in seen_plugins.items():
-        plugins_meta.append(PluginMeta(plugin_id=pid, tool_count=len(names), tool_names=names))
+    plugins_meta = _plugin_metadata(seen_plugins)
 
     logger.info(
         "loaded %d tools from %d plugins: %s",

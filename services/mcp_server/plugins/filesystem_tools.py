@@ -1,18 +1,50 @@
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
+from typing import Final
 
-from .common import ToolDef, err, is_readonly, now_ms, ok, parse_int, resolve_under_workspace
+from .common import JsonDict, ToolDef, err, is_readonly, now_ms, ok, parse_int, resolve_under_workspace
+
+PLUGIN_ID: Final = "mythosaur.filesystem"
+MAX_DIRECTORY_ENTRIES: Final = 500
 
 
-def _read_file(arguments: dict) -> dict:
-    started = now_ms()
-    path = (arguments.get("path") or "").strip()
-    max_bytes = parse_int(arguments.get("max_bytes"), default=200_000, minimum=1_024, maximum=10_000_000)
-    if not path:
-        return err("read_file", "missing_path", "path is required", "filesystem", started)
+def _path_arg(arguments: JsonDict, key: str, default: str = "") -> str:
+    return str(arguments.get(key) or default).strip()
+
+
+def _resolve_path_argument(tool_name: str, arguments: JsonDict, started: int, key: str = "path") -> tuple[Path | None, JsonDict | None]:
+    path_value = _path_arg(arguments, key)
+    if not path_value:
+        return None, err(tool_name, "missing_path", f"{key} is required", "filesystem", started)
     try:
-        target = resolve_under_workspace(path)
+        return resolve_under_workspace(path_value), None
+    except Exception as exc:
+        return None, err(tool_name, "invalid_path", str(exc), "filesystem", started)
+
+
+def _readonly_error(tool_name: str, started: int) -> JsonDict:
+    return err(tool_name, "forbidden", f"{tool_name} is blocked in readonly profile", "filesystem", started)
+
+
+def _entry_info(path: Path) -> JsonDict:
+    return {
+        "name": path.name,
+        "path": str(path),
+        "type": "dir" if path.is_dir() else "file",
+        "size": path.stat().st_size if path.exists() and path.is_file() else 0,
+    }
+
+
+def _read_file(arguments: JsonDict) -> JsonDict:
+    started = now_ms()
+    max_bytes = parse_int(arguments.get("max_bytes"), default=200_000, minimum=1_024, maximum=10_000_000)
+    target, error_result = _resolve_path_argument("read_file", arguments, started)
+    if error_result:
+        return error_result
+    assert target is not None
+    try:
         if not target.exists() or not target.is_file():
             return err("read_file", "not_file", f"file not found: {target}", "filesystem", started)
         raw = target.read_bytes()
@@ -24,19 +56,19 @@ def _read_file(arguments: dict) -> dict:
     return ok("read_file", {"path": str(target), "content": text}, "filesystem", started)
 
 
-def _write_file(arguments: dict) -> dict:
+def _write_file(arguments: JsonDict) -> JsonDict:
     started = now_ms()
     if is_readonly():
-        return err("write_file", "forbidden", "write_file is blocked in readonly profile", "filesystem", started)
-    path = (arguments.get("path") or "").strip()
+        return _readonly_error("write_file", started)
     content = str(arguments.get("content") or "")
-    mode = (arguments.get("mode") or "overwrite").strip().lower()
-    if not path:
-        return err("write_file", "missing_path", "path is required", "filesystem", started)
+    mode = _path_arg(arguments, "mode", "overwrite").lower()
     if mode not in {"overwrite", "append"}:
         return err("write_file", "invalid_mode", "mode must be overwrite|append", "filesystem", started)
+    target, error_result = _resolve_path_argument("write_file", arguments, started)
+    if error_result:
+        return error_result
+    assert target is not None
     try:
-        target = resolve_under_workspace(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         with target.open("a" if mode == "append" else "w", encoding="utf-8") as fh:
             fh.write(content)
@@ -45,53 +77,51 @@ def _write_file(arguments: dict) -> dict:
     return ok("write_file", {"path": str(target), "bytes": len(content.encode("utf-8")), "mode": mode}, "filesystem", started)
 
 
-def _list_directory(arguments: dict) -> dict:
+def _list_directory(arguments: JsonDict) -> JsonDict:
     started = now_ms()
-    path = (arguments.get("path") or ".").strip()
+    target, error_result = _resolve_path_argument(
+        "list_directory",
+        {"path": _path_arg(arguments, "path", ".")},
+        started,
+        key="path",
+    )
+    if error_result:
+        return error_result
+    assert target is not None
     try:
-        target = resolve_under_workspace(path)
         if not target.exists() or not target.is_dir():
             return err("list_directory", "not_directory", f"directory not found: {target}", "filesystem", started)
-        entries = []
-        for child in sorted(target.iterdir(), key=lambda p: p.name.lower())[:500]:
-            entries.append(
-                {
-                    "name": child.name,
-                    "path": str(child),
-                    "type": "dir" if child.is_dir() else "file",
-                    "size": child.stat().st_size if child.exists() and child.is_file() else 0,
-                }
-            )
+        entries = [_entry_info(child) for child in sorted(target.iterdir(), key=lambda item: item.name.lower())[:MAX_DIRECTORY_ENTRIES]]
     except Exception as exc:
         return err("list_directory", "list_failed", str(exc), "filesystem", started)
     return ok("list_directory", {"path": str(target), "entries": entries}, "filesystem", started)
 
 
-def _create_directory(arguments: dict) -> dict:
+def _create_directory(arguments: JsonDict) -> JsonDict:
     started = now_ms()
     if is_readonly():
-        return err("create_directory", "forbidden", "create_directory is blocked in readonly profile", "filesystem", started)
-    path = (arguments.get("path") or "").strip()
-    if not path:
-        return err("create_directory", "missing_path", "path is required", "filesystem", started)
+        return _readonly_error("create_directory", started)
+    target, error_result = _resolve_path_argument("create_directory", arguments, started)
+    if error_result:
+        return error_result
+    assert target is not None
     try:
-        target = resolve_under_workspace(path)
         target.mkdir(parents=True, exist_ok=bool(arguments.get("exist_ok", True)))
     except Exception as exc:
         return err("create_directory", "mkdir_failed", str(exc), "filesystem", started)
     return ok("create_directory", {"path": str(target)}, "filesystem", started)
 
 
-def _delete_file(arguments: dict) -> dict:
+def _delete_file(arguments: JsonDict) -> JsonDict:
     started = now_ms()
     if is_readonly():
-        return err("delete_file", "forbidden", "delete_file is blocked in readonly profile", "filesystem", started)
-    path = (arguments.get("path") or "").strip()
+        return _readonly_error("delete_file", started)
     recursive = bool(arguments.get("recursive", False))
-    if not path:
-        return err("delete_file", "missing_path", "path is required", "filesystem", started)
+    target, error_result = _resolve_path_argument("delete_file", arguments, started)
+    if error_result:
+        return error_result
+    assert target is not None
     try:
-        target = resolve_under_workspace(path)
         if target.is_dir():
             if not recursive:
                 return err("delete_file", "is_directory", "set recursive=true for directories", "filesystem", started)
@@ -103,12 +133,12 @@ def _delete_file(arguments: dict) -> dict:
     return ok("delete_file", {"path": str(target)}, "filesystem", started)
 
 
-def _move_file(arguments: dict) -> dict:
+def _move_file(arguments: JsonDict) -> JsonDict:
     started = now_ms()
     if is_readonly():
-        return err("move_file", "forbidden", "move_file is blocked in readonly profile", "filesystem", started)
-    src = (arguments.get("src") or "").strip()
-    dst = (arguments.get("dst") or "").strip()
+        return _readonly_error("move_file", started)
+    src = _path_arg(arguments, "src")
+    dst = _path_arg(arguments, "dst")
     overwrite = bool(arguments.get("overwrite", False))
     if not src or not dst:
         return err("move_file", "missing_path", "src and dst are required", "filesystem", started)
@@ -126,27 +156,28 @@ def _move_file(arguments: dict) -> dict:
     return ok("move_file", {"src": str(src_path), "dst": str(dst_path)}, "filesystem", started)
 
 
-def _search_files(arguments: dict) -> dict:
+def _search_files(arguments: JsonDict) -> JsonDict:
     started = now_ms()
-    query = (arguments.get("query") or "").strip().lower()
-    path = (arguments.get("path") or ".").strip()
+    query = _path_arg(arguments, "query").lower()
     max_results = parse_int(arguments.get("max_results"), default=50, minimum=1, maximum=500)
     if not query:
         return err("search_files", "missing_query", "query is required", "filesystem", started)
+    root, error_result = _resolve_path_argument(
+        "search_files",
+        {"path": _path_arg(arguments, "path", ".")},
+        started,
+        key="path",
+    )
+    if error_result:
+        return error_result
+    assert root is not None
     try:
-        root = resolve_under_workspace(path)
         if not root.exists() or not root.is_dir():
             return err("search_files", "not_directory", f"directory not found: {root}", "filesystem", started)
-        results = []
+        results: list[JsonDict] = []
         for item in root.rglob("*"):
             if query in item.name.lower():
-                results.append(
-                    {
-                        "name": item.name,
-                        "path": str(item),
-                        "type": "dir" if item.is_dir() else "file",
-                    }
-                )
+                results.append(_entry_info(item))
                 if len(results) >= max_results:
                     break
     except Exception as exc:
@@ -155,13 +186,13 @@ def _search_files(arguments: dict) -> dict:
     return ok("search_files", {"query": query, "path": str(root), "results": results}, "filesystem", started)
 
 
-def _get_file_info(arguments: dict) -> dict:
+def _get_file_info(arguments: JsonDict) -> JsonDict:
     started = now_ms()
-    path = (arguments.get("path") or "").strip()
-    if not path:
-        return err("get_file_info", "missing_path", "path is required", "filesystem", started)
+    target, error_result = _resolve_path_argument("get_file_info", arguments, started)
+    if error_result:
+        return error_result
+    assert target is not None
     try:
-        target = resolve_under_workspace(path)
         if not target.exists():
             return err("get_file_info", "missing", f"path not found: {target}", "filesystem", started)
         stat = target.stat()
@@ -181,7 +212,7 @@ def get_tools() -> list[ToolDef]:
     return [
         ToolDef(
             name="read_file",
-            plugin_id="mythosaur.filesystem",
+            plugin_id=PLUGIN_ID,
             description="Read UTF-8 text file under workspace root.",
             input_schema={
                 "type": "object",
@@ -197,7 +228,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="write_file",
-            plugin_id="mythosaur.filesystem",
+            plugin_id=PLUGIN_ID,
             description="Write file under workspace root (blocked in readonly profile).",
             input_schema={
                 "type": "object",
@@ -214,7 +245,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="list_directory",
-            plugin_id="mythosaur.filesystem",
+            plugin_id=PLUGIN_ID,
             description="List directory entries under workspace root.",
             input_schema={
                 "type": "object",
@@ -227,7 +258,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="create_directory",
-            plugin_id="mythosaur.filesystem",
+            plugin_id=PLUGIN_ID,
             description="Create directory under workspace root (blocked in readonly profile).",
             input_schema={
                 "type": "object",
@@ -243,7 +274,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="delete_file",
-            plugin_id="mythosaur.filesystem",
+            plugin_id=PLUGIN_ID,
             description="Delete file/dir under workspace root (blocked in readonly profile).",
             input_schema={
                 "type": "object",
@@ -259,7 +290,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="move_file",
-            plugin_id="mythosaur.filesystem",
+            plugin_id=PLUGIN_ID,
             description="Move file under workspace root (blocked in readonly profile).",
             input_schema={
                 "type": "object",
@@ -276,7 +307,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="search_files",
-            plugin_id="mythosaur.filesystem",
+            plugin_id=PLUGIN_ID,
             description="Search files/directories by name under workspace root.",
             input_schema={
                 "type": "object",
@@ -293,7 +324,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="get_file_info",
-            plugin_id="mythosaur.filesystem",
+            plugin_id=PLUGIN_ID,
             description="Return metadata for a file/directory under workspace root.",
             input_schema={
                 "type": "object",

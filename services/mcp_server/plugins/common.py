@@ -4,13 +4,26 @@ import asyncio
 import ipaddress
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Union
+from typing import Any, Final, Protocol, TypeAlias
 from urllib.parse import urlparse
 
-SyncHandler = Callable[[dict[str, Any]], dict[str, Any]]
-AsyncHandler = Callable[[dict[str, Any]], Coroutine[Any, Any, dict[str, Any]]]
+JsonDict: TypeAlias = dict[str, Any]
+
+
+class SyncHandler(Protocol):
+    def __call__(self, args: JsonDict, /) -> JsonDict: ...
+
+
+class AsyncHandler(Protocol):
+    async def __call__(self, args: JsonDict, /) -> JsonDict: ...
+
+
+Handler: TypeAlias = SyncHandler | AsyncHandler
+READONLY_PROFILE: Final = "readonly"
+POWER_PROFILE: Final = "power"
+TRUE_ENV_VALUES: Final = frozenset({"1", "true", "yes", "on"})
 
 
 @dataclass
@@ -18,12 +31,12 @@ class ToolDef:
     name: str
     plugin_id: str
     description: str
-    input_schema: dict[str, Any]
-    handler: Union[SyncHandler, AsyncHandler]
+    input_schema: JsonDict
+    handler: Handler
     aliases: list[str] | None = None
     is_async: bool = False
 
-    async def invoke(self, args: dict[str, Any]) -> dict[str, Any]:
+    async def invoke(self, args: JsonDict) -> JsonDict:
         if self.is_async:
             return await self.handler(args)
         return await asyncio.to_thread(self.handler, args)
@@ -33,36 +46,37 @@ def now_ms() -> int:
     return int(time.time() * 1000)
 
 
-def ok(tool: str, data: dict[str, Any], source: str, started_ms: int) -> dict[str, Any]:
+def _meta(source: str, started_ms: int) -> JsonDict:
+    return {
+        "duration_ms": max(0, now_ms() - started_ms),
+        "source": source,
+    }
+
+
+def ok(tool: str, data: JsonDict, source: str, started_ms: int) -> JsonDict:
     return {
         "status": "ok",
         "tool": tool,
         "data": data,
         "error": None,
-        "meta": {
-            "duration_ms": max(0, now_ms() - started_ms),
-            "source": source,
-        },
+        "meta": _meta(source, started_ms),
     }
 
 
-def err(tool: str, code: str, message: str, source: str, started_ms: int) -> dict[str, Any]:
+def err(tool: str, code: str, message: str, source: str, started_ms: int) -> JsonDict:
     return {
         "status": "error",
         "tool": tool,
         "data": {},
         "error": {"code": code, "message": message},
-        "meta": {
-            "duration_ms": max(0, now_ms() - started_ms),
-            "source": source,
-        },
+        "meta": _meta(source, started_ms),
     }
 
 
 def parse_int(value: Any, default: int, minimum: int | None = None, maximum: int | None = None) -> int:
     try:
         out = int(value)
-    except Exception:
+    except (TypeError, ValueError):
         out = default
     if minimum is not None:
         out = max(minimum, out)
@@ -152,11 +166,11 @@ def validate_fetch_url(url: str) -> None:
 
 
 def command_profile() -> str:
-    return (os.getenv("MYTHOSAUR_TOOLS_PROFILE") or "readonly").strip().lower() or "readonly"
+    return (os.getenv("MYTHOSAUR_TOOLS_PROFILE") or READONLY_PROFILE).strip().lower() or READONLY_PROFILE
 
 
 def is_readonly() -> bool:
-    return command_profile() != "power"
+    return command_profile() != POWER_PROFILE
 
 
 def bool_env(name: str, default: bool = False) -> bool:
@@ -164,7 +178,7 @@ def bool_env(name: str, default: bool = False) -> bool:
     raw = (os.getenv(name) or "").strip().lower()
     if not raw:
         return default
-    return raw in {"1", "true", "yes", "on"}
+    return raw in TRUE_ENV_VALUES
 
 
 def listify_strings(value: Any) -> list[str]:
