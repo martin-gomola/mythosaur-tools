@@ -4,13 +4,14 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
-from .common import ToolDef, err, now_ms, ok, parse_int, resolve_under_base, workspace_root
+from .common import JsonDict, ToolDef, err, now_ms, ok, parse_int, resolve_under_base, workspace_root
 
-
-MAX_SCAN_BYTES = 512 * 1024
-HOOK_MARKER = "# Managed by mythosaur-tools PII pre-commit hook"
+PLUGIN_ID: Final = "mythosaur.pii"
+PLUGIN_SOURCE: Final = "pii"
+MAX_SCAN_BYTES: Final = 512 * 1024
+HOOK_MARKER: Final = "# Managed by mythosaur-tools PII pre-commit hook"
 
 PATTERNS: list[tuple[str, str, str, re.Pattern[str]]] = [
     ("user_home_path", "high", "Possible local home path", re.compile(r"(/Users/[^/\s]+|/home/[^/\s]+)(/[^\s`'\"<>()]+)?")),
@@ -38,7 +39,7 @@ def pii_script_path() -> Path:
     return (tools_repo_root() / "scripts" / "pii_scan.py").resolve()
 
 
-def resolve_repo(arguments: dict[str, Any]) -> Path:
+def resolve_repo(arguments: JsonDict) -> Path:
     repo = str(arguments.get("repo") or ".").strip() or "."
     return resolve_under_base(repo, pii_root())
 
@@ -70,14 +71,7 @@ def _git_staged_files(repo_path: Path, *, include_untracked: bool) -> list[Path]
         if code != 0:
             raise RuntimeError(err_text or out or "git ls-files --others failed")
         paths.extend(repo_path / line for line in out.splitlines() if line.strip())
-    unique: list[Path] = []
-    seen: set[Path] = set()
-    for path in paths:
-        if path in seen:
-            continue
-        seen.add(path)
-        unique.append(path)
-    return unique
+    return _unique_paths(paths)
 
 
 def _walk_repo_files(repo_path: Path, *, max_files: int) -> list[Path]:
@@ -104,8 +98,42 @@ def _trim_snippet(text: str) -> str:
     return text[:157] + "..."
 
 
-def scan_paths(repo_path: Path, paths: list[Path], *, scope: str, tool_name: str, started: int) -> dict[str, Any]:
-    findings: list[dict[str, Any]] = []
+def _unique_paths(paths: list[Path]) -> list[Path]:
+    unique: list[Path] = []
+    seen: set[Path] = set()
+    for path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        unique.append(path)
+    return unique
+
+
+def _match_findings(repo_path: Path, path: Path, text: str) -> list[JsonDict]:
+    rel_path = str(path.relative_to(repo_path))
+    matches: list[JsonDict] = []
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        if "pii:allow" in line:
+            continue
+        for kind, severity, description, pattern in PATTERNS:
+            match = pattern.search(line)
+            if not match:
+                continue
+            matches.append(
+                {
+                    "path": rel_path,
+                    "line": line_no,
+                    "kind": kind,
+                    "severity": severity,
+                    "description": description,
+                    "snippet": _trim_snippet(line),
+                }
+            )
+    return matches
+
+
+def scan_paths(repo_path: Path, paths: list[Path], *, scope: str, tool_name: str, started: int) -> JsonDict:
+    findings: list[JsonDict] = []
     files_scanned = 0
 
     for path in paths:
@@ -125,24 +153,7 @@ def scan_paths(repo_path: Path, paths: list[Path], *, scope: str, tool_name: str
             except Exception:
                 continue
         files_scanned += 1
-        rel_path = str(path.relative_to(repo_path))
-        for line_no, line in enumerate(text.splitlines(), start=1):
-            if "pii:allow" in line:
-                continue
-            for kind, severity, description, pattern in PATTERNS:
-                match = pattern.search(line)
-                if not match:
-                    continue
-                findings.append(
-                    {
-                        "path": rel_path,
-                        "line": line_no,
-                        "kind": kind,
-                        "severity": severity,
-                        "description": description,
-                        "snippet": _trim_snippet(line),
-                    }
-                )
+        findings.extend(_match_findings(repo_path, path, text))
 
     return ok(
         tool_name,
@@ -155,12 +166,12 @@ def scan_paths(repo_path: Path, paths: list[Path], *, scope: str, tool_name: str
             "findings_count": len(findings),
             "findings": findings,
         },
-        "pii",
+        PLUGIN_SOURCE,
         started,
     )
 
 
-def _scan_repo(arguments: dict[str, Any]) -> dict[str, Any]:
+def _scan_repo(arguments: JsonDict) -> JsonDict:
     started = now_ms()
     try:
         repo_path = resolve_repo(arguments)
@@ -171,20 +182,20 @@ def _scan_repo(arguments: dict[str, Any]) -> dict[str, Any]:
             paths = _walk_repo_files(repo_path, max_files=max_files)
         return scan_paths(repo_path, paths[:max_files], scope="repo", tool_name="scan_pii_repo", started=started)
     except Exception as exc:
-        return err("scan_pii_repo", "pii_scan_error", str(exc), "pii", started)
+        return err("scan_pii_repo", "pii_scan_error", str(exc), PLUGIN_SOURCE, started)
 
 
-def _scan_staged(arguments: dict[str, Any]) -> dict[str, Any]:
+def _scan_staged(arguments: JsonDict) -> JsonDict:
     started = now_ms()
     try:
         repo_path = resolve_repo(arguments)
         include_untracked = bool(arguments.get("include_untracked", False))
         if not (repo_path / ".git").exists():
-            return err("scan_pii_staged", "not_git_repo", f"git metadata not found: {repo_path}", "pii", started)
+            return err("scan_pii_staged", "not_git_repo", f"git metadata not found: {repo_path}", PLUGIN_SOURCE, started)
         paths = _git_staged_files(repo_path, include_untracked=include_untracked)
         return scan_paths(repo_path, paths, scope="staged", tool_name="scan_pii_staged", started=started)
     except Exception as exc:
-        return err("scan_pii_staged", "pii_scan_error", str(exc), "pii", started)
+        return err("scan_pii_staged", "pii_scan_error", str(exc), PLUGIN_SOURCE, started)
 
 
 def _git_hook_path(repo_path: Path) -> Path:
@@ -197,12 +208,12 @@ def _git_hook_path(repo_path: Path) -> Path:
     return hook_path.resolve()
 
 
-def _install_hook(arguments: dict[str, Any]) -> dict[str, Any]:
+def _install_hook(arguments: JsonDict) -> JsonDict:
     started = now_ms()
     try:
         repo_path = resolve_repo(arguments)
         if not (repo_path / ".git").exists():
-            return err("install_pii_precommit_hook", "not_git_repo", f"git metadata not found: {repo_path}", "pii", started)
+            return err("install_pii_precommit_hook", "not_git_repo", f"git metadata not found: {repo_path}", PLUGIN_SOURCE, started)
 
         force = bool(arguments.get("force", False))
         hook_path = _git_hook_path(repo_path)
@@ -210,7 +221,7 @@ def _install_hook(arguments: dict[str, Any]) -> dict[str, Any]:
         backup_path = hook_path.with_name("pre-commit.local")
         script_path = pii_script_path()
         if not script_path.exists():
-            return err("install_pii_precommit_hook", "missing_script", f"pii scan script not found: {script_path}", "pii", started)
+            return err("install_pii_precommit_hook", "missing_script", f"pii scan script not found: {script_path}", PLUGIN_SOURCE, started)
 
         existing = hook_path.read_text(encoding="utf-8") if hook_path.exists() else ""
         if hook_path.exists() and HOOK_MARKER not in existing:
@@ -219,7 +230,7 @@ def _install_hook(arguments: dict[str, Any]) -> dict[str, Any]:
                     "install_pii_precommit_hook",
                     "hook_exists",
                     f"pre-commit hook already exists at {hook_path}; rerun with force=true to preserve it as pre-commit.local",
-                    "pii",
+                    PLUGIN_SOURCE,
                     started,
                 )
             if not backup_path.exists():
@@ -247,11 +258,11 @@ def _install_hook(arguments: dict[str, Any]) -> dict[str, Any]:
                 "script_path": str(script_path),
                 "force": force,
             },
-            "pii",
+            PLUGIN_SOURCE,
             started,
         )
     except Exception as exc:
-        return err("install_pii_precommit_hook", "hook_install_error", str(exc), "pii", started)
+        return err("install_pii_precommit_hook", "hook_install_error", str(exc), PLUGIN_SOURCE, started)
 
 
 def get_tools() -> list[ToolDef]:
@@ -261,7 +272,7 @@ def get_tools() -> list[ToolDef]:
     return [
         ToolDef(
             name="scan_pii_staged",
-            plugin_id="mythosaur.pii",
+            plugin_id=PLUGIN_ID,
             description="Scan staged files in a git repo for PII or secret-like values.",
             input_schema={
                 "type": "object",
@@ -277,7 +288,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="scan_pii_repo",
-            plugin_id="mythosaur.pii",
+            plugin_id=PLUGIN_ID,
             description="Scan a repository or directory for PII or secret-like values.",
             input_schema={
                 "type": "object",
@@ -293,7 +304,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="install_pii_precommit_hook",
-            plugin_id="mythosaur.pii",
+            plugin_id=PLUGIN_ID,
             description="Install a local pre-commit hook that runs the mythosaur-tools PII scanner.",
             input_schema={
                 "type": "object",

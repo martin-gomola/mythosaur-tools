@@ -5,7 +5,7 @@ import logging
 import pkgutil
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Callable, Final
+from typing import Final
 
 from .common import ToolDef
 

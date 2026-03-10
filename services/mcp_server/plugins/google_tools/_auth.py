@@ -11,17 +11,20 @@ import os
 import re
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import requests
 
-from ..common import bool_env, err
+from ..common import JsonDict, bool_env, err
 
 # --- Validation constants ---
 _MAX_CONTENT_BYTES = 10 * 1024 * 1024
 _MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 _MAX_LABEL_IDS = 20
 _MAX_DRIVE_QUERY_LEN = 1000
+GOOGLE_SOURCE: Final = "google"
+DEFAULT_TOKEN_FILE: Final = "/secrets/google-token.json"
+DEFAULT_CREDENTIALS_FILE: Final = "/secrets/google-credentials.json"
 
 # --- Regex patterns ---
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -64,13 +67,13 @@ def _safe_error_msg(exc: Exception) -> str:
 def _validate_emails(tool_name: str, field: str, emails: list[str], started: int) -> dict[str, Any] | None:
     for addr in emails:
         if not _EMAIL_RE.match(addr):
-            return err(tool_name, "invalid_email", f"invalid email in {field}: {addr}", "google", started)
+            return err(tool_name, "invalid_email", f"invalid email in {field}: {addr}", GOOGLE_SOURCE, started)
     return None
 
 
 def _validate_rfc3339(tool_name: str, field: str, value: str, started: int) -> dict[str, Any] | None:
     if value and not _RFC3339_LIKE_RE.match(value):
-        return err(tool_name, "invalid_timestamp", f"{field} must be RFC 3339 format", "google", started)
+        return err(tool_name, "invalid_timestamp", f"{field} must be RFC 3339 format", GOOGLE_SOURCE, started)
     return None
 
 
@@ -82,7 +85,7 @@ def _validate_content_size(
         return err(
             tool_name, "content_too_large",
             f"content is {size} bytes, max allowed is {max_bytes}",
-            "google", started,
+            GOOGLE_SOURCE, started,
         )
     return None
 
@@ -145,12 +148,12 @@ def _google_modules():
 
 
 def _token_file() -> Path:
-    raw = (os.getenv("MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE") or "/secrets/google-token.json").strip()
+    raw = (os.getenv("MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE") or DEFAULT_TOKEN_FILE).strip()
     return Path(raw)
 
 
 def _credentials_file() -> Path:
-    raw = (os.getenv("MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE") or "/secrets/google-credentials.json").strip()
+    raw = (os.getenv("MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE") or DEFAULT_CREDENTIALS_FILE).strip()
     return Path(raw)
 
 
@@ -212,7 +215,7 @@ def _maps_api_guard(tool_name: str, started: int) -> dict[str, Any] | None:
         tool_name,
         "maps_api_key_missing",
         "Google Maps API key is not configured. Set GOOGLE_MAPS_API_KEY.",
-        "google",
+        GOOGLE_SOURCE,
         started,
     )
 
@@ -237,7 +240,29 @@ def google_capabilities() -> dict[str, bool]:
     }
 
 
-def google_auth_status() -> dict[str, Any]:
+def _granted_scopes(payload: JsonDict) -> list[str]:
+    raw_scopes = payload.get("scopes") or payload.get("scope") or []
+    if isinstance(raw_scopes, str):
+        return [item.strip() for item in raw_scopes.split() if item.strip()]
+    if isinstance(raw_scopes, list):
+        return [str(item).strip() for item in raw_scopes if str(item).strip()]
+    return []
+
+
+def _scope_checks(granted_scopes: list[str]) -> dict[str, JsonDict]:
+    granted = set(granted_scopes)
+    checks: dict[str, JsonDict] = {}
+    for capability, required in _GOOGLE_SCOPE_REQUIREMENTS.items():
+        missing = [scope for scope in required if scope not in granted]
+        checks[capability] = {
+            "required_scopes": list(required),
+            "granted": not missing,
+            "missing_scopes": missing,
+        }
+    return checks
+
+
+def google_auth_status() -> JsonDict:
     token_file = _token_file()
     service_checks = _google_service_checks()
     if not token_file.exists():
@@ -261,29 +286,13 @@ def google_auth_status() -> dict[str, Any]:
             "error": "invalid token file: unable to parse token JSON",
         }
 
-    raw_scopes = payload.get("scopes") or payload.get("scope") or []
-    if isinstance(raw_scopes, str):
-        granted_scopes = [item.strip() for item in raw_scopes.split() if item.strip()]
-    elif isinstance(raw_scopes, list):
-        granted_scopes = [str(item).strip() for item in raw_scopes if str(item).strip()]
-    else:
-        granted_scopes = []
-
-    granted = set(granted_scopes)
-    checks: dict[str, dict[str, Any]] = {}
-    for capability, required in _GOOGLE_SCOPE_REQUIREMENTS.items():
-        missing = [scope for scope in required if scope not in granted]
-        checks[capability] = {
-            "required_scopes": list(required),
-            "granted": not missing,
-            "missing_scopes": missing,
-        }
+    granted_scopes = _granted_scopes(payload)
 
     return {
         "token_file": str(token_file),
         "token_present": True,
         "granted_scopes": granted_scopes,
-        "scope_checks": checks,
+        "scope_checks": _scope_checks(granted_scopes),
         "service_checks": service_checks,
     }
 
@@ -296,6 +305,6 @@ def _capability_guard(tool_name: str, capability_key: str, started: int) -> dict
         tool_name,
         "capability_disabled",
         f"Google capability '{capability_key}' is disabled by configuration.",
-        "google",
+        GOOGLE_SOURCE,
         started,
     )

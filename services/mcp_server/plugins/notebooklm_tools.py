@@ -5,52 +5,56 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
-from .common import ToolDef, err, now_ms, ok, parse_int
+from .common import JsonDict, ToolDef, bool_env, err, now_ms, ok, parse_int
 
-GOOGLE_PLUGIN_ID = "mythosaur.google_workspace"
+PLUGIN_ID: Final = "mythosaur.google_workspace"
+PLUGIN_SOURCE: Final = "notebooklm"
+DEFAULT_TOOL_BIN: Final = "nlm"
+DEFAULT_STORAGE_DIR: Final = "/secrets/notebooklm"
+DEFAULT_PROFILE: Final = "default"
+DEFAULT_TIMEOUT_SECONDS: Final = 120
 
 
 def _tool_bin() -> str:
-    return (os.getenv("MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN") or "nlm").strip() or "nlm"
+    return (os.getenv("MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN") or DEFAULT_TOOL_BIN).strip() or DEFAULT_TOOL_BIN
 
 
 def _storage_dir() -> Path:
-    raw = (os.getenv("NOTEBOOKLM_MCP_CLI_PATH") or "/secrets/notebooklm").strip() or "/secrets/notebooklm"
+    raw = (os.getenv("NOTEBOOKLM_MCP_CLI_PATH") or DEFAULT_STORAGE_DIR).strip() or DEFAULT_STORAGE_DIR
     return Path(raw)
 
 
 def _default_profile() -> str:
-    return (os.getenv("MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE") or "default").strip() or "default"
+    return (os.getenv("MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE") or DEFAULT_PROFILE).strip() or DEFAULT_PROFILE
 
 
 def _default_timeout() -> int:
-    return parse_int(os.getenv("MYTHOSAUR_TOOLS_NOTEBOOKLM_TIMEOUT"), 120, minimum=10, maximum=600)
+    return parse_int(os.getenv("MYTHOSAUR_TOOLS_NOTEBOOKLM_TIMEOUT"), DEFAULT_TIMEOUT_SECONDS, minimum=10, maximum=600)
 
 
 def _notebooklm_enabled() -> bool:
-    raw = (os.getenv("MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED") or "true").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
+    return bool_env("MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED", True)
 
 
-def _enabled_guard(tool_name: str, started: int) -> dict[str, Any] | None:
+def _enabled_guard(tool_name: str, started: int) -> JsonDict | None:
     if _notebooklm_enabled():
         return None
     return err(
         tool_name,
         "capability_disabled",
         "NotebookLM capability is disabled by configuration.",
-        "notebooklm",
+        PLUGIN_SOURCE,
         started,
     )
 
 
-def _profile(args: dict[str, Any]) -> str:
-    return (args.get("profile") or _default_profile() or "default").strip()
+def _profile(args: JsonDict) -> str:
+    return str(args.get("profile") or _default_profile() or DEFAULT_PROFILE).strip()
 
 
-def _timeout_seconds(args: dict[str, Any]) -> int:
+def _timeout_seconds(args: JsonDict) -> int:
     return parse_int(args.get("timeout_seconds"), _default_timeout(), minimum=10, maximum=600)
 
 
@@ -89,13 +93,13 @@ def _run_json_command(
     *,
     started_ms: int,
     timeout_seconds: int,
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+) -> tuple[JsonDict | None, JsonDict | None]:
     if not _binary_exists():
         return None, err(
             tool_name,
             "notebooklm_cli_missing",
             f"NotebookLM CLI '{_tool_bin()}' is not installed in the current runtime.",
-            "notebooklm",
+            PLUGIN_SOURCE,
             started_ms,
         )
 
@@ -106,7 +110,7 @@ def _run_json_command(
             tool_name,
             "notebooklm_timeout",
             f"NotebookLM CLI timed out after {timeout_seconds}s.",
-            "notebooklm",
+            PLUGIN_SOURCE,
             started_ms,
         )
     except Exception as exc:
@@ -114,7 +118,7 @@ def _run_json_command(
             tool_name,
             "notebooklm_cli_failed",
             str(exc),
-            "notebooklm",
+            PLUGIN_SOURCE,
             started_ms,
         )
 
@@ -123,7 +127,7 @@ def _run_json_command(
             tool_name,
             "notebooklm_cli_failed",
             _failure_message(proc),
-            "notebooklm",
+            PLUGIN_SOURCE,
             started_ms,
         )
 
@@ -134,7 +138,7 @@ def _run_json_command(
             tool_name,
             "notebooklm_output_invalid",
             f"NotebookLM CLI returned non-JSON output: {exc}",
-            "notebooklm",
+            PLUGIN_SOURCE,
             started_ms,
         )
 
@@ -153,7 +157,7 @@ def _auth_status(args: dict[str, Any]) -> dict[str, Any]:
             tool_name,
             "notebooklm_cli_missing",
             f"NotebookLM CLI '{_tool_bin()}' is not installed in the current runtime.",
-            "notebooklm",
+            PLUGIN_SOURCE,
             started,
         )
 
@@ -167,11 +171,11 @@ def _auth_status(args: dict[str, Any]) -> dict[str, Any]:
             tool_name,
             "notebooklm_timeout",
             f"NotebookLM auth check timed out after {timeout_seconds}s.",
-            "notebooklm",
+            PLUGIN_SOURCE,
             started,
         )
     except Exception as exc:
-        return err(tool_name, "notebooklm_cli_failed", str(exc), "notebooklm", started)
+        return err(tool_name, "notebooklm_cli_failed", str(exc), PLUGIN_SOURCE, started)
 
     message = _failure_message(proc)
     return ok(
@@ -183,7 +187,7 @@ def _auth_status(args: dict[str, Any]) -> dict[str, Any]:
             "storage_dir": str(_storage_dir()),
             "message": message,
         },
-        "notebooklm",
+        PLUGIN_SOURCE,
         started,
     )
 
@@ -235,7 +239,7 @@ def _list_notebooks(args: dict[str, Any]) -> dict[str, Any]:
             "shared_by_me_count": shared_by_me_count,
             "notebooks": notebooks,
         },
-        "notebooklm",
+        PLUGIN_SOURCE,
         started,
     )
 
@@ -258,7 +262,7 @@ def _query_notebook(args: dict[str, Any]) -> dict[str, Any]:
             tool_name,
             "missing_args",
             "notebook_id and question are required",
-            "notebooklm",
+            PLUGIN_SOURCE,
             started,
         )
 
@@ -285,7 +289,7 @@ def _query_notebook(args: dict[str, Any]) -> dict[str, Any]:
             tool_name,
             "notebooklm_output_invalid",
             "NotebookLM query returned an unexpected payload.",
-            "notebooklm",
+            PLUGIN_SOURCE,
             started,
         )
 
@@ -301,7 +305,7 @@ def _query_notebook(args: dict[str, Any]) -> dict[str, Any]:
             "sources_used": payload.get("sources_used") or [],
             "citations": payload.get("citations") or {},
         },
-        "notebooklm",
+        PLUGIN_SOURCE,
         started,
     )
 
@@ -317,7 +321,7 @@ def _create_notebook(args: dict[str, Any]) -> dict[str, Any]:
     tool_name = "notebooklm_create_notebook"
 
     if not title:
-        return err(tool_name, "missing_args", "title is required", "notebooklm", started)
+        return err(tool_name, "missing_args", "title is required", PLUGIN_SOURCE, started)
 
     payload, error_result = _run_json_command(
         tool_name,
@@ -329,7 +333,7 @@ def _create_notebook(args: dict[str, Any]) -> dict[str, Any]:
         return error_result
 
     if not isinstance(payload, dict):
-        return err(tool_name, "notebooklm_output_invalid", "Unexpected CLI output.", "notebooklm", started)
+        return err(tool_name, "notebooklm_output_invalid", "Unexpected CLI output.", PLUGIN_SOURCE, started)
 
     return ok(
         tool_name,
@@ -339,7 +343,7 @@ def _create_notebook(args: dict[str, Any]) -> dict[str, Any]:
             "title": payload.get("title", title),
             "url": payload.get("url", ""),
         },
-        "notebooklm",
+        PLUGIN_SOURCE,
         started,
     )
 
@@ -355,7 +359,7 @@ def _list_sources(args: dict[str, Any]) -> dict[str, Any]:
     tool_name = "notebooklm_list_sources"
 
     if not notebook_id:
-        return err(tool_name, "missing_args", "notebook_id is required", "notebooklm", started)
+        return err(tool_name, "missing_args", "notebook_id is required", PLUGIN_SOURCE, started)
 
     payload, error_result = _run_json_command(
         tool_name,
@@ -380,7 +384,7 @@ def _list_sources(args: dict[str, Any]) -> dict[str, Any]:
             "source_count": len(sources),
             "sources": sources,
         },
-        "notebooklm",
+        PLUGIN_SOURCE,
         started,
     )
 
@@ -404,13 +408,13 @@ def _add_source(args: dict[str, Any]) -> dict[str, Any]:
         return err(
             tool_name, "missing_args",
             "notebook_id, source_type, and source_value are required",
-            "notebooklm", started,
+            PLUGIN_SOURCE, started,
         )
     if source_type not in _ALLOWED_SOURCE_TYPES:
         return err(
             tool_name, "invalid_source_type",
             f"source_type must be one of: {', '.join(sorted(_ALLOWED_SOURCE_TYPES))}",
-            "notebooklm", started,
+            PLUGIN_SOURCE, started,
         )
 
     cmd = [_tool_bin(), "source", "add", notebook_id, f"--{source_type}", source_value, "--json", "--profile", profile]
@@ -422,7 +426,7 @@ def _add_source(args: dict[str, Any]) -> dict[str, Any]:
         return error_result
 
     if not isinstance(payload, dict):
-        return err(tool_name, "notebooklm_output_invalid", "Unexpected CLI output.", "notebooklm", started)
+        return err(tool_name, "notebooklm_output_invalid", "Unexpected CLI output.", PLUGIN_SOURCE, started)
 
     return ok(
         tool_name,
@@ -434,7 +438,7 @@ def _add_source(args: dict[str, Any]) -> dict[str, Any]:
             "title": payload.get("title", ""),
             "status": payload.get("status", "added"),
         },
-        "notebooklm",
+        PLUGIN_SOURCE,
         started,
     )
 
@@ -455,12 +459,12 @@ def _create_studio_content(args: dict[str, Any]) -> dict[str, Any]:
     tool_name = "notebooklm_create_studio_content"
 
     if not notebook_id:
-        return err(tool_name, "missing_args", "notebook_id is required", "notebooklm", started)
+        return err(tool_name, "missing_args", "notebook_id is required", PLUGIN_SOURCE, started)
     if content_type not in _ALLOWED_STUDIO_TYPES:
         return err(
             tool_name, "invalid_content_type",
             f"content_type must be one of: {', '.join(sorted(_ALLOWED_STUDIO_TYPES))}",
-            "notebooklm", started,
+            PLUGIN_SOURCE, started,
         )
 
     cmd = [_tool_bin(), "studio", "create", notebook_id, "--type", content_type, "--confirm", "--json", "--profile", profile]
@@ -474,7 +478,7 @@ def _create_studio_content(args: dict[str, Any]) -> dict[str, Any]:
         return error_result
 
     if not isinstance(payload, dict):
-        return err(tool_name, "notebooklm_output_invalid", "Unexpected CLI output.", "notebooklm", started)
+        return err(tool_name, "notebooklm_output_invalid", "Unexpected CLI output.", PLUGIN_SOURCE, started)
 
     return ok(
         tool_name,
@@ -486,7 +490,7 @@ def _create_studio_content(args: dict[str, Any]) -> dict[str, Any]:
             "status": payload.get("status", ""),
             "url": payload.get("url", ""),
         },
-        "notebooklm",
+        PLUGIN_SOURCE,
         started,
     )
 
@@ -507,7 +511,7 @@ def _download_artifact(args: dict[str, Any]) -> dict[str, Any]:
         return err(
             tool_name, "missing_args",
             "notebook_id and artifact_id are required",
-            "notebooklm", started,
+            PLUGIN_SOURCE, started,
         )
 
     cmd = [_tool_bin(), "download", artifact_type, notebook_id, artifact_id, "--json", "--profile", profile]
@@ -519,7 +523,7 @@ def _download_artifact(args: dict[str, Any]) -> dict[str, Any]:
         return error_result
 
     if not isinstance(payload, dict):
-        return err(tool_name, "notebooklm_output_invalid", "Unexpected CLI output.", "notebooklm", started)
+        return err(tool_name, "notebooklm_output_invalid", "Unexpected CLI output.", PLUGIN_SOURCE, started)
 
     return ok(
         tool_name,
@@ -532,7 +536,7 @@ def _download_artifact(args: dict[str, Any]) -> dict[str, Any]:
             "file_size": payload.get("file_size") or payload.get("size", 0),
             "status": payload.get("status", "downloaded"),
         },
-        "notebooklm",
+        PLUGIN_SOURCE,
         started,
     )
 
@@ -549,9 +553,9 @@ def _share_notebook(args: dict[str, Any]) -> dict[str, Any]:
     tool_name = "notebooklm_share"
 
     if not notebook_id:
-        return err(tool_name, "missing_args", "notebook_id is required", "notebooklm", started)
+        return err(tool_name, "missing_args", "notebook_id is required", PLUGIN_SOURCE, started)
     if share_type not in ("public", "invite"):
-        return err(tool_name, "invalid_share_type", "share_type must be 'public' or 'invite'", "notebooklm", started)
+        return err(tool_name, "invalid_share_type", "share_type must be 'public' or 'invite'", PLUGIN_SOURCE, started)
 
     cmd = [_tool_bin(), "share", share_type, notebook_id, "--json", "--profile", profile]
 
@@ -562,7 +566,7 @@ def _share_notebook(args: dict[str, Any]) -> dict[str, Any]:
         return error_result
 
     if not isinstance(payload, dict):
-        return err(tool_name, "notebooklm_output_invalid", "Unexpected CLI output.", "notebooklm", started)
+        return err(tool_name, "notebooklm_output_invalid", "Unexpected CLI output.", PLUGIN_SOURCE, started)
 
     return ok(
         tool_name,
@@ -573,7 +577,7 @@ def _share_notebook(args: dict[str, Any]) -> dict[str, Any]:
             "url": payload.get("url") or payload.get("share_url", ""),
             "status": payload.get("status", "shared"),
         },
-        "notebooklm",
+        PLUGIN_SOURCE,
         started,
     )
 
@@ -582,7 +586,7 @@ def get_tools() -> list[ToolDef]:
     return [
         ToolDef(
             name="notebooklm_auth_status",
-            plugin_id=GOOGLE_PLUGIN_ID,
+            plugin_id=PLUGIN_ID,
             description="Check whether the configured NotebookLM profile is authenticated.",
             input_schema={
                 "type": "object",
@@ -598,7 +602,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="notebooklm_list_notebooks",
-            plugin_id=GOOGLE_PLUGIN_ID,
+            plugin_id=PLUGIN_ID,
             description="List NotebookLM notebooks available to the configured account.",
             input_schema={
                 "type": "object",
@@ -615,7 +619,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="notebooklm_query_notebook",
-            plugin_id=GOOGLE_PLUGIN_ID,
+            plugin_id=PLUGIN_ID,
             description="Ask a grounded question against a NotebookLM notebook.",
             input_schema={
                 "type": "object",
@@ -635,7 +639,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="notebooklm_create_notebook",
-            plugin_id=GOOGLE_PLUGIN_ID,
+            plugin_id=PLUGIN_ID,
             description="Create a new NotebookLM notebook with the given title.",
             input_schema={
                 "type": "object",
@@ -652,7 +656,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="notebooklm_list_sources",
-            plugin_id=GOOGLE_PLUGIN_ID,
+            plugin_id=PLUGIN_ID,
             description="List sources attached to a NotebookLM notebook.",
             input_schema={
                 "type": "object",
@@ -669,7 +673,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="notebooklm_add_source",
-            plugin_id=GOOGLE_PLUGIN_ID,
+            plugin_id=PLUGIN_ID,
             description="Add a source to a NotebookLM notebook. Supported types: url, text, drive, file.",
             input_schema={
                 "type": "object",
@@ -695,7 +699,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="notebooklm_create_studio_content",
-            plugin_id=GOOGLE_PLUGIN_ID,
+            plugin_id=PLUGIN_ID,
             description="Generate studio content from a notebook (audio podcast, video, mind map, infographic, slides, or briefing document).",
             input_schema={
                 "type": "object",
@@ -721,7 +725,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="notebooklm_download_artifact",
-            plugin_id=GOOGLE_PLUGIN_ID,
+            plugin_id=PLUGIN_ID,
             description="Download a generated artifact (audio, image, etc.) from a NotebookLM notebook.",
             input_schema={
                 "type": "object",
@@ -744,7 +748,7 @@ def get_tools() -> list[ToolDef]:
         ),
         ToolDef(
             name="notebooklm_share",
-            plugin_id=GOOGLE_PLUGIN_ID,
+            plugin_id=PLUGIN_ID,
             description="Share a NotebookLM notebook publicly or via invite link.",
             input_schema={
                 "type": "object",
