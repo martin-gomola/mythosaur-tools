@@ -24,6 +24,8 @@ It runs as a Docker stack and exposes tools over HTTP POST at `/mcp`.
 - **Orchestration logic** (message loops, skills routing, chat context) belongs in the consuming repo.
 - **Shared skills** (routing policies that decide *when* to call a tool) live in `skills/shared/` and are exported to consumers.
 - If a capability should work across `mythosaur-ai`, Codex, Cursor, Claude Code, and other MCP consumers, the handler belongs here.
+- **Current boundary**: search, fetch, browser, Google Workspace, and PII are shared through `mythosaur-tools`.
+- **Intentional exceptions**: workspace filesystem mutation and local git operations stay in `mythosaur-ai` because direct host access is more reliable than Docker-mounted writes for the Nanobot runtime.
 
 ## Architecture
 
@@ -143,6 +145,7 @@ On error: `status: "error"`, `data: {}`, `error: { "code": "...", "message": "..
 
 ## Hard Rules
 
+- **Current date:** For "today", "this week", or any date range, use the `current_time` MCP tool (mythosaur-tools) with the user's timezone (e.g. `Europe/Bratislava`) rather than trusting the session context "Today's date"—the latter can be wrong (e.g. off by a year).
 - Do not duplicate tool execution logic in consumer repos. If the tool exists here, call it over MCP.
 - Do not embed consumer-specific routing in tool handlers. Tools are consumer-agnostic.
 - All file operations must go through `resolve_under_workspace` or `resolve_under_base` path guards.

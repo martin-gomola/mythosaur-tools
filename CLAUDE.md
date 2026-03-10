@@ -143,6 +143,7 @@ On error: `status: "error"`, `data: {}`, `error: { "code": "...", "message": "..
 
 ## Hard Rules
 
+- **Current date:** For "today", "this week", or any date range, use the `current_time` MCP tool (mythosaur-tools) with the user's timezone (e.g. `Europe/Bratislava`) rather than trusting the session context "Today's date"—the latter can be wrong (e.g. off by a year).
 - Do not duplicate tool execution logic in consumer repos. If the tool exists here, call it over MCP.
 - Do not embed consumer-specific routing in tool handlers. Tools are consumer-agnostic.
 - All file operations must go through `resolve_under_workspace` or `resolve_under_base` path guards.
