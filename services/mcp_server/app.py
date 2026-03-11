@@ -6,6 +6,7 @@ import logging
 import os
 import secrets
 import time
+from dataclasses import dataclass
 from typing import Any, Final
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
@@ -21,6 +22,10 @@ API_VERSION: Final = "0.2.0"
 MCP_PROTOCOL_VERSION: Final = "2024-11-05"
 SERVICE_NAME: Final = "mythosaur-tools"
 JSONRPC_VERSION: Final = "2.0"
+READONLY_PROFILE: Final = "readonly"
+SEARCH_PLUGIN_ID: Final = "mythosaur.search"
+BROWSER_PLUGIN_ID: Final = "mythosaur.browser"
+GOOGLE_PLUGIN_ID: Final = "mythosaur.google_workspace"
 
 app = FastAPI(title=SERVICE_NAME, version=API_VERSION)
 TOOLS, PLUGINS_META = load_tools()
@@ -40,13 +45,25 @@ _usage_last_summary_at = 0.0
 JsonDict = dict[str, Any]
 
 
+@dataclass(frozen=True)
+class McpRequestContext:
+    request_id: Any
+    method: str
+    params: JsonDict
+    started_at: float
+
+
+def _now() -> float:
+    return time.time()
+
+
 def _record_tool_usage(name: str, status: str, duration_ms: int) -> None:
     global _usage_total_calls, _usage_last_summary_at
 
     _usage_total_calls += 1
     _usage_tool_counts[name] += 1
 
-    now = time.time()
+    now = _now()
     due_by_count = _USAGE_LOG_EVERY > 0 and _usage_total_calls % _USAGE_LOG_EVERY == 0
     due_by_time = _USAGE_SUMMARY_INTERVAL_SEC > 0 and (now - _usage_last_summary_at) >= _USAGE_SUMMARY_INTERVAL_SEC
     if _usage_total_calls != 1 and not due_by_count and not due_by_time:
@@ -79,13 +96,13 @@ def _require_auth(auth_header: str | None) -> str:
 
 
 def _session_payload() -> dict[str, float]:
-    return {"created_at": time.time()}
+    return {"created_at": _now()}
 
 
 def _check_rate_limit(key: str) -> None:
     if _RATE_MAX_CALLS <= 0:
         return
-    now = time.time()
+    now = _now()
     window = _rate_ledger[key]
     cutoff = now - _RATE_WINDOW_SEC
     _rate_ledger[key] = [ts for ts in window if ts > cutoff]
@@ -99,7 +116,7 @@ def _check_rate_limit(key: str) -> None:
 
 def _periodic_cleanup() -> None:
     global _last_cleanup_at
-    now = time.time()
+    now = _now()
     if now - _last_cleanup_at < _CLEANUP_INTERVAL_SEC:
         return
     _last_cleanup_at = now
@@ -170,11 +187,11 @@ def _build_health_plugins() -> list[JsonDict]:
             "tool_count": plugin_meta.tool_count,
             "tools": plugin_meta.tool_names,
         }
-        if plugin_meta.plugin_id == "mythosaur.search":
+        if plugin_meta.plugin_id == SEARCH_PLUGIN_ID:
             entry["searxng_configured"] = bool(searxng_url)
-        if plugin_meta.plugin_id == "mythosaur.browser":
+        if plugin_meta.plugin_id == BROWSER_PLUGIN_ID:
             entry["browser_enabled"] = browser_enabled
-        if plugin_meta.plugin_id == "mythosaur.google_workspace":
+        if plugin_meta.plugin_id == GOOGLE_PLUGIN_ID:
             entry["capabilities"] = google_capabilities()
             entry["auth"] = google_auth_status()
         plugins.append(entry)
@@ -232,7 +249,7 @@ async def _invoke_tool(tool: ToolDef, args: JsonDict, started_at: float) -> Json
         return await tool.invoke(args)
     except Exception as exc:
         logger.exception("tool execution error name=%s", tool.name)
-        elapsed_ms = int((time.time() - started_at) * 1000)
+        elapsed_ms = int((_now() - started_at) * 1000)
         return {
             "status": "error",
             "tool": tool.name,
@@ -243,7 +260,7 @@ async def _invoke_tool(tool: ToolDef, args: JsonDict, started_at: float) -> Json
 
 
 def _log_tool_call(name: str, tool_result: JsonDict, started_at: float) -> int:
-    elapsed_ms = int((time.time() - started_at) * 1000)
+    elapsed_ms = int((_now() - started_at) * 1000)
     status = str(tool_result.get("status") or "unknown")
     logger.info(
         "mcp.tools.call name=%s status=%s duration_ms=%s",
@@ -255,6 +272,61 @@ def _log_tool_call(name: str, tool_result: JsonDict, started_at: float) -> int:
     return elapsed_ms
 
 
+def _profile_name() -> str:
+    return (os.getenv("MYTHOSAUR_TOOLS_PROFILE") or READONLY_PROFILE).strip().lower()
+
+
+async def _request_context(request: Request) -> McpRequestContext:
+    payload = await request.json()
+    params = payload.get("params") or {}
+    if not isinstance(params, dict):
+        params = {}
+    return McpRequestContext(
+        request_id=payload.get("id"),
+        method=str(payload.get("method") or ""),
+        params=params,
+        started_at=_now(),
+    )
+
+
+def _handle_initialize(context: McpRequestContext, response: Response, session_id: str | None) -> JsonDict:
+    return _response(context.request_id, result=_initialize_session(response, session_id))
+
+
+def _handle_tools_list(context: McpRequestContext) -> JsonDict:
+    plugin_filter = _parse_plugin_filter(context.params.get("plugins"))
+    return _response(context.request_id, result={"tools": _build_tools_list(plugin_filter)})
+
+
+async def _handle_tools_call(context: McpRequestContext) -> JsonDict:
+    name = str(context.params.get("name") or "").strip()
+    args = context.params.get("arguments") or {}
+    if not isinstance(args, dict):
+        return _error_response(context.request_id, -32602, "arguments must be an object")
+
+    tool = TOOLS.get(name)
+    if tool is None:
+        return _error_response(context.request_id, -32601, f"unknown tool: {name}")
+
+    tool_result = await _invoke_tool(tool, args, context.started_at)
+    _log_tool_call(name, tool_result, context.started_at)
+    return _response(context.request_id, result=_to_mcp_content(tool_result))
+
+
+async def _dispatch_mcp_request(
+    context: McpRequestContext,
+    response: Response,
+    session_id: str | None,
+) -> JsonDict:
+    if context.method == "initialize":
+        return _handle_initialize(context, response, session_id)
+    if context.method == "tools/list":
+        return _handle_tools_list(context)
+    if context.method == "tools/call":
+        return await _handle_tools_call(context)
+    return _error_response(context.request_id, -32601, f"unsupported method: {context.method}")
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, Any]:
     return {
@@ -262,7 +334,7 @@ def healthz() -> dict[str, Any]:
         "service": SERVICE_NAME,
         "version": API_VERSION,
         "protocol_version": MCP_PROTOCOL_VERSION,
-        "profile": (os.getenv("MYTHOSAUR_TOOLS_PROFILE") or "readonly").strip().lower(),
+        "profile": _profile_name(),
         "tools_count": len(_iter_unique_tools()),
         "plugins": _build_health_plugins(),
     }
@@ -288,32 +360,5 @@ async def mcp_endpoint(
     token = _require_auth(authorization)
     _check_rate_limit(token[:8])
     _periodic_cleanup()
-
-    started_at = time.time()
-    payload = await request.json()
-    method = str(payload.get("method") or "")
-    request_id = payload.get("id")
-
-    if method == "initialize":
-        return _response(request_id, result=_initialize_session(response, mcp_session_id))
-
-    if method == "tools/list":
-        params = payload.get("params") or {}
-        plugin_filter = _parse_plugin_filter(params.get("plugins"))
-        return _response(request_id, result={"tools": _build_tools_list(plugin_filter)})
-
-    if method == "tools/call":
-        params = payload.get("params") or {}
-        name = str(params.get("name") or "").strip()
-        args = params.get("arguments") or {}
-        tool = TOOLS.get(name)
-        if not tool:
-            return _error_response(request_id, -32601, f"unknown tool: {name}")
-        if not isinstance(args, dict):
-            return _error_response(request_id, -32602, "arguments must be an object")
-
-        tool_result = await _invoke_tool(tool, args, started_at)
-        _log_tool_call(name, tool_result, started_at)
-        return _response(request_id, result=_to_mcp_content(tool_result))
-
-    return _error_response(request_id, -32601, f"unsupported method: {method}")
+    context = await _request_context(request)
+    return await _dispatch_mcp_request(context, response, mcp_session_id)

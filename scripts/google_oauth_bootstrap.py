@@ -6,6 +6,7 @@ import json
 import os
 import stat
 from pathlib import Path
+from typing import Final
 
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
@@ -39,8 +40,11 @@ SCOPE_PRESETS = {
 }
 
 
-_GOOGLE_SCOPE_PREFIX = "https://www.googleapis.com/auth/"
-_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+GOOGLE_SCOPE_PREFIX: Final = "https://www.googleapis.com/auth/"
+LOOPBACK_HOSTS: Final = frozenset({"127.0.0.1", "localhost", "::1"})
+DEFAULT_CREDENTIALS_PATH: Final = "secrets/google-credentials.json"
+DEFAULT_TOKEN_PATH: Final = "secrets/google-token.json"
+DEFAULT_PRESET: Final = "workspace"
 
 
 def _write_token(token_path: Path, data: str) -> None:
@@ -80,18 +84,18 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--credentials",
-        default="secrets/google-credentials.json",
+        default=DEFAULT_CREDENTIALS_PATH,
         help="Path to the Google OAuth client credentials JSON.",
     )
     parser.add_argument(
         "--token",
-        default="secrets/google-token.json",
+        default=DEFAULT_TOKEN_PATH,
         help="Path to write the authorized user token JSON.",
     )
     parser.add_argument(
         "--preset",
         choices=sorted(SCOPE_PRESETS),
-        default="workspace",
+        default=DEFAULT_PRESET,
         help="Scope preset to request.",
     )
     parser.add_argument(
@@ -122,6 +126,22 @@ def _parse_args() -> argparse.Namespace:
         help="Do not auto-open the browser; print the consent URL instead.",
     )
     return parser.parse_args()
+
+
+def _validate_scope(scope: str) -> None:
+    if not scope.startswith(GOOGLE_SCOPE_PREFIX):
+        raise SystemExit(f"Invalid scope (must start with {GOOGLE_SCOPE_PREFIX}): {scope}")
+
+
+def _validate_host(host: str) -> None:
+    if host not in LOOPBACK_HOSTS:
+        raise SystemExit(f"Refusing to bind OAuth callback to non-loopback address: {host}")
+
+
+def _resolved_paths(args: argparse.Namespace) -> tuple[Path, Path]:
+    credentials_path = Path(args.credentials).expanduser().resolve(strict=False)
+    token_path = Path(args.token).expanduser().resolve(strict=False)
+    return credentials_path, token_path
 
 
 def _load_existing_token(token_path: Path, scopes: list[str]) -> Credentials | None:
@@ -155,19 +175,12 @@ def _load_existing_token(token_path: Path, scopes: list[str]) -> Credentials | N
 
 def main() -> int:
     args = _parse_args()
-    credentials_path = Path(args.credentials).expanduser().resolve(strict=False)
-    token_path = Path(args.token).expanduser().resolve(strict=False)
+    credentials_path, token_path = _resolved_paths(args)
 
     for scope in args.scope:
-        if not scope.startswith(_GOOGLE_SCOPE_PREFIX):
-            raise SystemExit(
-                f"Invalid scope (must start with {_GOOGLE_SCOPE_PREFIX}): {scope}"
-            )
+        _validate_scope(scope)
 
-    if args.host not in _LOOPBACK_HOSTS:
-        raise SystemExit(
-            f"Refusing to bind OAuth callback to non-loopback address: {args.host}"
-        )
+    _validate_host(args.host)
 
     scopes = _dedupe([*SCOPE_PRESETS[args.preset], *args.scope])
 
