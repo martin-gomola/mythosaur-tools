@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Final
+from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
@@ -41,6 +43,83 @@ def _safe_headers(raw: JsonDict) -> dict[str, str]:
             continue
         out[k] = v
     return out
+
+
+def _text_content_type(headers: dict[str, str]) -> str:
+    for key, value in headers.items():
+        if key.lower() == "content-type":
+            return str(value or "")
+    return ""
+
+
+def _clean_text_chunks(chunks: list[str]) -> str:
+    cleaned: list[str] = []
+    for chunk in chunks:
+        text = re.sub(r"\s+", " ", str(chunk or "")).strip()
+        if text:
+            cleaned.append(text)
+    return "\n\n".join(cleaned)
+
+
+def _clip_text(text: str, *, max_chars: int) -> tuple[str, bool]:
+    if len(text) <= max_chars:
+        return text, False
+    clipped = text[:max_chars].rstrip()
+    last_space = clipped.rfind(" ")
+    if last_space >= max_chars // 2:
+        clipped = clipped[:last_space].rstrip()
+    return clipped, True
+
+
+def _select_html_nodes(soup: BeautifulSoup, selector: str) -> list:
+    if selector:
+        return list(soup.select(selector))
+    for preferred in ("article", "main", "[role='main']"):
+        nodes = soup.select(preferred)
+        if nodes:
+            return list(nodes)
+    if soup.body is not None:
+        return [soup.body]
+    return [soup]
+
+
+def _canonical_url(soup: BeautifulSoup, final_url: str) -> str:
+    canonical = soup.find("link", rel=lambda value: value and "canonical" in str(value).lower())
+    href = str(canonical.get("href") or "").strip() if canonical else ""
+    return urljoin(final_url, href) if href else final_url
+
+
+def _extract_html_content(
+    html: str,
+    *,
+    final_url: str,
+    selector: str,
+    max_chars: int,
+) -> dict[str, object]:
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup.select("script, style, noscript"):
+        tag.decompose()
+
+    nodes = _select_html_nodes(soup, selector)
+    text = _clean_text_chunks([node.get_text(" ", strip=True) for node in nodes])
+    text, truncated = _clip_text(text, max_chars=max_chars)
+
+    title = ""
+    if soup.title is not None:
+        title = re.sub(r"\s+", " ", soup.title.get_text(" ", strip=True)).strip()
+
+    return {
+        "source_type": "url",
+        "title": title,
+        "canonical_url": _canonical_url(soup, final_url),
+        "text": text,
+        "truncated": truncated,
+        "metadata": {
+            "selector": selector,
+            "text_length": len(text),
+            "word_count": len(text.split()),
+        },
+    }
 
 
 def _validate_url(tool_name: str, arguments: JsonDict, started: int) -> str | JsonDict:
@@ -160,6 +239,52 @@ async def _fetch_html(arguments: JsonDict) -> JsonDict:
     )
 
 
+async def _extract_content(arguments: JsonDict) -> JsonDict:
+    started = now_ms()
+    selector = str(arguments.get("selector") or "").strip()
+    max_chars = _int_arg(arguments, "max_chars", default=12_000, minimum=500, maximum=50_000)
+    response = await _run_fetch_request(
+        "extract_content",
+        arguments,
+        default_timeout=12,
+        default_max_bytes=1_000_000,
+    )
+    if isinstance(response, dict):
+        return response
+    status, resp_headers, raw, final_url = response
+    content_type = _text_content_type(resp_headers).lower()
+    decoded = raw.decode("utf-8", errors="replace")
+
+    if "html" in content_type or decoded.lstrip().startswith("<"):
+        extracted = _extract_html_content(
+            decoded,
+            final_url=final_url,
+            selector=selector,
+            max_chars=max_chars,
+        )
+    else:
+        text, truncated = _clip_text(re.sub(r"\s+", " ", decoded).strip(), max_chars=max_chars)
+        extracted = {
+            "source_type": "url",
+            "title": "",
+            "canonical_url": final_url,
+            "text": text,
+            "truncated": truncated,
+            "metadata": {
+                "selector": selector,
+                "text_length": len(text),
+                "word_count": len(text.split()),
+            },
+        }
+
+    metadata = extracted.get("metadata")
+    if isinstance(metadata, dict):
+        metadata["status_code"] = status
+        metadata["content_type"] = content_type
+
+    return ok("extract_content", extracted, PLUGIN_SOURCE, started)
+
+
 async def _download(arguments: JsonDict) -> JsonDict:
     started = now_ms()
     url_val = str(arguments.get("url") or "").strip()
@@ -256,6 +381,24 @@ def get_tools() -> list[ToolDef]:
             },
             handler=_fetch_html,
             aliases=["osaurus.fetch_html"],
+            is_async=True,
+        ),
+        ToolDef(
+            name="extract_content",
+            plugin_id=PLUGIN_ID,
+            description="Fetch a URL and return normalized extracted content for local summarization.",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    **common,
+                    "selector": {"type": "string"},
+                    "max_chars": {"type": "integer", "minimum": 500, "maximum": 50000},
+                },
+                "required": ["url"],
+            },
+            handler=_extract_content,
+            aliases=["osaurus.extract_content"],
             is_async=True,
         ),
         ToolDef(

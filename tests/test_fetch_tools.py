@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+import services.mcp_server.plugins.fetch_tools as fetch_tools
 from services.mcp_server.plugins.fetch_tools import get_tools
 
 
@@ -31,6 +32,12 @@ def test_fetch_json_missing_url():
 
 def test_fetch_html_missing_url():
     payload = _run(_tool("fetch_html").handler({}))
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "missing_url"
+
+
+def test_extract_content_missing_url():
+    payload = _run(_tool("extract_content").handler({}))
     assert payload["status"] == "error"
     assert payload["error"]["code"] == "missing_url"
 
@@ -64,6 +71,41 @@ def test_fetch_invalid_url():
     payload = _run(_tool("fetch").handler({"url": "not-a-url"}))
     assert payload["status"] == "error"
     assert payload["error"]["code"] == "blocked_url"
+
+
+def test_extract_content_returns_normalized_html(monkeypatch):
+    async def _fake_fetch_core(url: str, headers: dict[str, str], timeout: int, max_bytes: int):
+        html = b"""
+        <html>
+          <head>
+            <title>Example Story</title>
+            <link rel="canonical" href="/canonical-story" />
+          </head>
+              <body>
+                <article>
+                  <h1>Launch Notes</h1>
+                  <p>The service shipped a cleaner extraction contract that keeps summary inputs narrow, auditable, and easy to test across clients without leaning on a shell wrapper. The service shipped a cleaner extraction contract that keeps summary inputs narrow, auditable, and easy to test across clients without leaning on a shell wrapper.</p>
+                  <p>It also preserves title and canonical URL data while clipping oversized content before it reaches the local summarizer, which keeps prompts bounded and predictable for a fast runtime path. It also preserves title and canonical URL data while clipping oversized content before it reaches the local summarizer, which keeps prompts bounded and predictable for a fast runtime path.</p>
+                  <p>This final paragraph exists only to push the extracted article well beyond the clipping threshold used in the test. This final paragraph exists only to push the extracted article well beyond the clipping threshold used in the test.</p>
+                </article>
+              </body>
+            </html>
+            """
+        return 200, {"content-type": "text/html; charset=utf-8"}, html, url
+
+    monkeypatch.setattr(fetch_tools, "_fetch_core", _fake_fetch_core)
+
+    payload = _run(_tool("extract_content").handler({"url": "https://example.com/story", "max_chars": 500}))
+
+    assert payload["status"] == "ok"
+    data = payload["data"]
+    assert data["source_type"] == "url"
+    assert data["title"] == "Example Story"
+    assert data["canonical_url"] == "https://example.com/canonical-story"
+    assert data["truncated"] is True
+    assert "Launch Notes" in data["text"]
+    assert data["metadata"]["status_code"] == 200
+    assert data["metadata"]["content_type"] == "text/html; charset=utf-8"
 
 
 @pytest.mark.parametrize("url,tool_name", [
