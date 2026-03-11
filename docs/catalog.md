@@ -8,8 +8,8 @@ This page keeps the long-form reference out of the front door.
 |---|---|
 | `mythosaur.time` | `current_time`, `format_date` |
 | `mythosaur.git` | `git_status`, `git_log`, `git_diff`, `git_branch` |
-| `mythosaur.browser` | `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_select`, `browser_hover`, `browser_scroll`, `browser_press_key`, `browser_wait_for`, `browser_screenshot`, `browser_execute_script` |
-| `mythosaur.fetch` | `fetch`, `fetch_json`, `fetch_html`, `download` |
+| `mythosaur.browser` | `browser_navigate`, `browser_extract_content`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_select`, `browser_hover`, `browser_scroll`, `browser_press_key`, `browser_wait_for`, `browser_screenshot`, `browser_execute_script` |
+| `mythosaur.fetch` | `fetch`, `fetch_json`, `fetch_html`, `extract_content`, `download` |
 | `mythosaur.transcript` | `extract_transcript` |
 | `mythosaur.search` | `search`, `search_news`, `search_images` |
 | `mythosaur.filesystem` | `read_file`, `write_file`, `list_directory`, `create_directory`, `delete_file`, `move_file`, `search_files`, `get_file_info` |

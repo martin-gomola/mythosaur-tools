@@ -10,6 +10,7 @@ This repository keeps network-facing tools, external integrations, and shared sk
 
 - search, fetch, browser, Google Workspace, NotebookLM, and PII tooling
 - transcript extraction for supported video URLs
+- browser-backed rendered-page extraction for difficult sites
 - a single MCP HTTP surface for local runtimes and IDE clients
 - the shared source-of-truth for reusable Mythosaur skills
 
@@ -52,7 +53,7 @@ Tool families currently forged here:
 - time and date helpers
 - web search and fetch
 - transcript extraction for supported video URLs
-- browser automation
+- browser automation and rendered-page extraction fallback
 - guarded filesystem and git access for the mounted workspace
 - Google Workspace, Google Maps, Google Photos, and NotebookLM tools
 - PII scanning and pre-commit hook install helpers

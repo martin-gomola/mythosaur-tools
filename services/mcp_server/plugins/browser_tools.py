@@ -4,10 +4,10 @@ import base64
 import os
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
-from .common import ToolDef, bool_env, err, now_ms, ok, parse_int, resolve_under_workspace
+from .common import ToolDef, bool_env, err, now_ms, ok, parse_int, resolve_under_workspace, validate_fetch_url
+from .content_extraction import extract_html_content
 
 
 @dataclass
@@ -108,6 +108,51 @@ def _snapshot(args: dict) -> dict:
         return ok("browser_snapshot", {"session_id": sess.session_id, "url": sess.page.url, "text": text}, "browser", started)
     except Exception as exc:
         return err("browser_snapshot", "snapshot_failed", str(exc), "browser", started)
+
+
+def _extract_content(args: dict) -> dict:
+    started = now_ms()
+    if not BROWSER.enabled():
+        return _not_enabled("browser_extract_content", started)
+
+    url = (args.get("url") or "").strip()
+    if not url:
+        return err("browser_extract_content", "missing_url", "url is required", "browser", started)
+    if "://" not in url:
+        url = f"https://{url}"
+    try:
+        validate_fetch_url(url)
+    except ValueError as exc:
+        return err("browser_extract_content", "blocked_url", str(exc), "browser", started)
+
+    selector = (args.get("selector") or "").strip()
+    wait_until = (args.get("wait_until") or "domcontentloaded").strip() or "domcontentloaded"
+    timeout_ms = parse_int(args.get("timeout_ms"), 30000, 1000, 120000)
+    settle_ms = parse_int(args.get("settle_ms"), 1200, 0, 10000)
+    max_chars = parse_int(args.get("max_chars"), 12000, 500, 50000)
+    session_id = f"browser-extract-{uuid.uuid4().hex[:12]}"
+
+    try:
+        sess = BROWSER.get(session_id, create=True)
+        sess.page.goto(url, wait_until=wait_until, timeout=timeout_ms)
+        if settle_ms > 0:
+            sess.page.wait_for_timeout(settle_ms)
+        extracted = extract_html_content(
+            sess.page.content(),
+            final_url=sess.page.url,
+            selector=selector,
+            max_chars=max_chars,
+            metadata={
+                "browser_used": True,
+                "wait_until": wait_until,
+                "settle_ms": settle_ms,
+            },
+        )
+        return ok("browser_extract_content", extracted, "browser", started)
+    except Exception as exc:
+        return err("browser_extract_content", "extract_failed", str(exc), "browser", started)
+    finally:
+        BROWSER.close(session_id)
 
 
 def _click(args: dict) -> dict:
@@ -284,6 +329,14 @@ def get_tools() -> list[ToolDef]:
             "wait_until": {"type": "string", "default": "domcontentloaded"},
             "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000},
         }, ["url"]), _navigate, aliases=["osaurus.browser_navigate"]),
+        ToolDef("browser_extract_content", "mythosaur.browser", "Render a page in the browser and return normalized extracted content.", _schema({
+            "url": {"type": "string"},
+            "selector": {"type": "string"},
+            "wait_until": {"type": "string", "default": "domcontentloaded"},
+            "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 120000},
+            "settle_ms": {"type": "integer", "minimum": 0, "maximum": 10000, "default": 1200},
+            "max_chars": {"type": "integer", "minimum": 500, "maximum": 50000, "default": 12000},
+        }, ["url"]), _extract_content, aliases=["osaurus.browser_extract_content"]),
         ToolDef("browser_snapshot", "mythosaur.browser", "Get text snapshot from current page.", _schema({
             "session_id": {"type": "string"},
             "max_chars": {"type": "integer", "minimum": 100, "maximum": 200000, "default": 8000},

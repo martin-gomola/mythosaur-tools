@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 import re
 from typing import Final
-from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
 
 from .common import JsonDict, ToolDef, err, now_ms, ok, parse_int, resolve_under_workspace, validate_fetch_url
+from .content_extraction import clip_text, extract_html_content
 
 PLUGIN_ID: Final = "mythosaur.fetch"
 PLUGIN_SOURCE: Final = "fetch"
@@ -50,76 +50,6 @@ def _text_content_type(headers: dict[str, str]) -> str:
         if key.lower() == "content-type":
             return str(value or "")
     return ""
-
-
-def _clean_text_chunks(chunks: list[str]) -> str:
-    cleaned: list[str] = []
-    for chunk in chunks:
-        text = re.sub(r"\s+", " ", str(chunk or "")).strip()
-        if text:
-            cleaned.append(text)
-    return "\n\n".join(cleaned)
-
-
-def _clip_text(text: str, *, max_chars: int) -> tuple[str, bool]:
-    if len(text) <= max_chars:
-        return text, False
-    clipped = text[:max_chars].rstrip()
-    last_space = clipped.rfind(" ")
-    if last_space >= max_chars // 2:
-        clipped = clipped[:last_space].rstrip()
-    return clipped, True
-
-
-def _select_html_nodes(soup: BeautifulSoup, selector: str) -> list:
-    if selector:
-        return list(soup.select(selector))
-    for preferred in ("article", "main", "[role='main']"):
-        nodes = soup.select(preferred)
-        if nodes:
-            return list(nodes)
-    if soup.body is not None:
-        return [soup.body]
-    return [soup]
-
-
-def _canonical_url(soup: BeautifulSoup, final_url: str) -> str:
-    canonical = soup.find("link", rel=lambda value: value and "canonical" in str(value).lower())
-    href = str(canonical.get("href") or "").strip() if canonical else ""
-    return urljoin(final_url, href) if href else final_url
-
-
-def _extract_html_content(
-    html: str,
-    *,
-    final_url: str,
-    selector: str,
-    max_chars: int,
-) -> dict[str, object]:
-    soup = BeautifulSoup(html, "html.parser")
-    for tag in soup.select("script, style, noscript"):
-        tag.decompose()
-
-    nodes = _select_html_nodes(soup, selector)
-    text = _clean_text_chunks([node.get_text(" ", strip=True) for node in nodes])
-    text, truncated = _clip_text(text, max_chars=max_chars)
-
-    title = ""
-    if soup.title is not None:
-        title = re.sub(r"\s+", " ", soup.title.get_text(" ", strip=True)).strip()
-
-    return {
-        "source_type": "url",
-        "title": title,
-        "canonical_url": _canonical_url(soup, final_url),
-        "text": text,
-        "truncated": truncated,
-        "metadata": {
-            "selector": selector,
-            "text_length": len(text),
-            "word_count": len(text.split()),
-        },
-    }
 
 
 def _validate_url(tool_name: str, arguments: JsonDict, started: int) -> str | JsonDict:
@@ -256,14 +186,14 @@ async def _extract_content(arguments: JsonDict) -> JsonDict:
     decoded = raw.decode("utf-8", errors="replace")
 
     if "html" in content_type or decoded.lstrip().startswith("<"):
-        extracted = _extract_html_content(
+        extracted = extract_html_content(
             decoded,
             final_url=final_url,
             selector=selector,
             max_chars=max_chars,
         )
     else:
-        text, truncated = _clip_text(re.sub(r"\s+", " ", decoded).strip(), max_chars=max_chars)
+        text, truncated = clip_text(re.sub(r"\s+", " ", decoded).strip(), max_chars=max_chars)
         extracted = {
             "source_type": "url",
             "title": "",
