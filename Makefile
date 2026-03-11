@@ -3,6 +3,7 @@
 # ──────────────────────────────────────────────────
 
 .PHONY: help up down restart logs config test commit \
+        codex-up codex-install codex-smoke \
         google-login google-login-ssh notebooklm-login \
         notebooklm-login-manual _check-env
 
@@ -31,6 +32,7 @@ help:
 	@echo "    make restart         Restart the tools stack"
 	@echo "    make logs [S=name]   Tail logs"
 	@echo "    make config          Render docker compose config"
+	@echo "    make codex-up        Start an IDE-facing stack with default consumer=codex"
 	@echo ""
 	@echo "  Auth:"
 	@echo "    make google-login            Create or refresh Google OAuth and NotebookLM auth"
@@ -40,6 +42,8 @@ help:
 	@echo ""
 	@echo "  Dev:"
 	@echo "    make test            Run backend tests"
+	@echo "    make codex-install   Export shared + Codex adapter skills"
+	@echo "    make codex-smoke     Verify the Codex consumer catalog"
 	@echo "    make commit          Stage all changes and commit interactively"
 	@echo ""
 
@@ -49,6 +53,9 @@ help:
 
 up: _check-env
 	$(COMPOSE) up -d --build
+
+codex-up: _check-env
+	MYTHOSAUR_TOOLS_DEFAULT_CONSUMER=codex $(COMPOSE) up -d --build
 
 down:
 	$(COMPOSE) down
@@ -69,6 +76,13 @@ config: _check-env
 
 test:
 	@$(UV) run --with-requirements services/mcp_server/requirements.txt python -m pytest tests/test_google_workspace_tools.py tests/test_app.py
+
+codex-install:
+	@bash ./scripts/export-skills.sh --consumer codex
+
+codex-smoke:
+	@bash ./scripts/smoke_consumer_catalog.sh codex query
+	@bash ./scripts/smoke_consumer_catalog.sh codex header
 
 # ──────────────────────────────────────────────────
 #  Auth — Google OAuth & NotebookLM

@@ -47,3 +47,11 @@ Response is JSON with a `result.content` array. Each entry has `type: "text"` an
 - **No results from resolve**: try broader or alternate library names.
 - **Empty docs response**: rephrase the query to be more specific.
 - **Auth errors**: verify `CONTEXT7_API_KEY` starts with `ctx7sk` and is valid.
+
+## Standalone Mode
+
+If Context7 is unavailable:
+
+- fall back to official library documentation or primary-source docs
+- state that live Context7 retrieval was unavailable
+- continue with best-effort guidance rather than blocking the task

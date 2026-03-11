@@ -36,3 +36,12 @@ The skill owns:
 - when to trigger
 - which tool to call
 - how to react to findings
+
+## Standalone Mode
+
+If the shared PII MCP tools are unavailable:
+
+- stop the commit anyway
+- run an equivalent local scan if one is available
+- manually inspect staged diffs for emails, home paths, tokens, and auth material
+- do not proceed until the findings are either redacted or intentionally suppressed

@@ -28,9 +28,10 @@ description: >
    - `google`: calendar, email, drive, sheets, docs, photos, maps, notebooklm.
    - `pii`: scan staged files or repos for sensitive data.
 2. If `chat_only`, answer directly without tool calls.
-3. If tool is needed, call exactly one MCP tool first.
-4. Call additional tools only when prior output proves it is required.
-5. If request is ambiguous, ask one short clarification instead of broad tool fan-out.
+3. If the consumer runtime already has native local filesystem, shell, or git tools, prefer those for local work before MCP.
+4. If tool is needed, call exactly one MCP tool first.
+5. Call additional tools only when prior output proves it is required.
+6. If request is ambiguous, ask one short clarification instead of broad tool fan-out.
 
 ## Canonical MCP Map
 
@@ -51,7 +52,8 @@ description: >
 How tools are invoked depends on the consumer runtime:
 
 - **mythosaur-ai**: use the repo's MCP wrapper if that runtime exposes one.
-- **Codex / Cursor / Claude Code / direct MCP clients**: call tools by name via `tools/call`.
+- **Direct MCP clients**: call tools by name via `tools/call`.
+- **Consumers with native local tools**: satisfy local filesystem and git tasks natively when possible, and reserve MCP for remote or shared execution capabilities.
 
 mythosaur-ai wrapper example:
 
@@ -65,6 +67,8 @@ mythosaur-ai wrapper example:
 
 ## Safety
 
+- Prefer native local tools over MCP for local git and filesystem work when the consumer supports them.
+- If MCP execution is unavailable, still provide useful output such as a draft, plan, command, or explanation of the missing remote step.
 - Respect active tool profile (`readonly` vs `power`).
 - Keep filesystem/download paths under workspace root only.
 - Never attempt blocked mutating filesystem tools in `readonly`.

@@ -49,6 +49,49 @@ If you run the MCP server on a different port, update the `url` in `.cursor/mcp.
 
 For standalone Cursor use, set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` to `.` for this repo or to the path of the project you actually have open in Cursor. Restart the stack after changing it.
 
+## Export Skills for Codex
+
+Export the shared skills plus the Codex adapter bundle:
+
+```bash
+./scripts/export-skills.sh --consumer codex
+make codex-install
+```
+
+That bundle installs:
+
+- the portable workflows from `skills/shared/`
+- the Codex adapter from `skills/consumers/codex/`
+
+The Codex adapter is expected to prefer native Codex tools for local filesystem, shell,
+git, and code editing work, while using `mythosaur-tools` MCP for remote execution such as
+search, fetch, browser, transcript, PII, and Google-family tools:
+
+- Calendar and Gmail
+- Drive, Sheets, and Docs
+- Photos and Maps
+- NotebookLM
+
+If the client cannot send a consumer hint during `tools/list`, run a dedicated IDE-facing
+instance with:
+
+```bash
+MYTHOSAUR_TOOLS_DEFAULT_CONSUMER=codex docker compose up -d --build
+```
+
+Verify the filtered catalog with:
+
+```bash
+./scripts/smoke_consumer_catalog.sh codex query
+./scripts/smoke_consumer_catalog.sh codex header
+make codex-smoke
+```
+
+The export writes a manifest to `~/.codex/skills/mythosaur/.export-manifest.json` so you can verify:
+
+- which skills were copied into the Mythosaur bundle
+- which sibling top-level Codex skills were overwritten with newer Mythosaur versions
+
 ## Smoke Test
 
 ```bash

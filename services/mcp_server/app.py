@@ -26,6 +26,32 @@ READONLY_PROFILE: Final = "readonly"
 SEARCH_PLUGIN_ID: Final = "mythosaur.search"
 BROWSER_PLUGIN_ID: Final = "mythosaur.browser"
 GOOGLE_PLUGIN_ID: Final = "mythosaur.google_workspace"
+FETCH_PLUGIN_ID: Final = "mythosaur.fetch"
+TRANSCRIPT_PLUGIN_ID: Final = "mythosaur.transcript"
+TIME_PLUGIN_ID: Final = "mythosaur.time"
+PII_PLUGIN_ID: Final = "mythosaur.pii"
+DEFAULT_CONSUMER_ENV: Final = "MYTHOSAUR_TOOLS_DEFAULT_CONSUMER"
+CONSUMER_HEADER: Final = "X-Mythosaur-Consumer"
+IDE_REMOTE_PLUGIN_IDS: Final = frozenset(
+    {
+        TIME_PLUGIN_ID,
+        SEARCH_PLUGIN_ID,
+        FETCH_PLUGIN_ID,
+        TRANSCRIPT_PLUGIN_ID,
+        BROWSER_PLUGIN_ID,
+        GOOGLE_PLUGIN_ID,
+        PII_PLUGIN_ID,
+    }
+)
+CONSUMER_PLUGIN_FILTERS: Final[dict[str, set[str] | None]] = {
+    "all": None,
+    "default": None,
+    "mythosaur-ai": None,
+    "codex": set(IDE_REMOTE_PLUGIN_IDS),
+    "cursor": set(IDE_REMOTE_PLUGIN_IDS),
+    "claude-code": set(IDE_REMOTE_PLUGIN_IDS),
+    "ide": set(IDE_REMOTE_PLUGIN_IDS),
+}
 
 app = FastAPI(title=SERVICE_NAME, version=API_VERSION)
 TOOLS, PLUGINS_META = load_tools()
@@ -50,6 +76,7 @@ class McpRequestContext:
     request_id: Any
     method: str
     params: JsonDict
+    consumer_hint: str | None
     started_at: float
 
 
@@ -176,6 +203,51 @@ def _parse_plugin_filter(raw_value: Any) -> set[str]:
     return {plugin_id.strip() for plugin_id in raw_value.split(",") if plugin_id.strip()}
 
 
+def _resolve_consumer_plugin_filter(raw_value: Any) -> set[str] | None:
+    if raw_value is None:
+        return None
+    consumer = str(raw_value).strip().lower()
+    if not consumer:
+        return None
+    if consumer not in CONSUMER_PLUGIN_FILTERS:
+        known = ", ".join(sorted(CONSUMER_PLUGIN_FILTERS))
+        raise ValueError(f"unknown consumer: {consumer} (expected one of: {known})")
+    plugin_filter = CONSUMER_PLUGIN_FILTERS[consumer]
+    return None if plugin_filter is None else set(plugin_filter)
+
+
+def _default_consumer_name() -> str | None:
+    raw = (os.getenv(DEFAULT_CONSUMER_ENV) or "").strip()
+    if not raw:
+        return None
+    _resolve_consumer_plugin_filter(raw)
+    return raw
+
+
+def _effective_consumer_name(explicit_value: Any, header_value: str | None = None) -> str | None:
+    explicit = str(explicit_value).strip() if explicit_value is not None else ""
+    if explicit:
+        _resolve_consumer_plugin_filter(explicit)
+        return explicit
+
+    header = (header_value or "").strip()
+    if header:
+        _resolve_consumer_plugin_filter(header)
+        return header
+
+    return _default_consumer_name()
+
+
+def _merge_plugin_filters(base: set[str], consumer_filter: set[str] | None) -> set[str] | None:
+    if not base and consumer_filter is None:
+        return None
+    if not base:
+        return consumer_filter
+    if consumer_filter is None:
+        return base
+    return base & consumer_filter
+
+
 def _build_health_plugins() -> list[JsonDict]:
     searxng_url = (os.getenv("MYTHOSAUR_TOOLS_SEARXNG_URL") or "").strip()
     browser_enabled = bool_env("MYTHOSAUR_TOOLS_BROWSER_ENABLED", False)
@@ -198,7 +270,7 @@ def _build_health_plugins() -> list[JsonDict]:
     return plugins
 
 
-def _build_schema_tools() -> list[JsonDict]:
+def _build_schema_tools(plugin_filter: set[str] | None = None) -> list[JsonDict]:
     return sorted(
         [
             {
@@ -208,7 +280,7 @@ def _build_schema_tools() -> list[JsonDict]:
                 "input_schema": tool.input_schema,
                 "aliases": tool.aliases or [],
             }
-            for tool in _iter_unique_tools()
+            for tool in _iter_unique_tools(plugin_filter)
         ],
         key=lambda item: str(item["name"]),
     )
@@ -285,6 +357,7 @@ async def _request_context(request: Request) -> McpRequestContext:
         request_id=payload.get("id"),
         method=str(payload.get("method") or ""),
         params=params,
+        consumer_hint=None,
         started_at=_now(),
     )
 
@@ -295,7 +368,13 @@ def _handle_initialize(context: McpRequestContext, response: Response, session_i
 
 def _handle_tools_list(context: McpRequestContext) -> JsonDict:
     plugin_filter = _parse_plugin_filter(context.params.get("plugins"))
-    return _response(context.request_id, result={"tools": _build_tools_list(plugin_filter)})
+    try:
+        consumer_name = _effective_consumer_name(context.params.get("consumer"), context.consumer_hint)
+        consumer_filter = _resolve_consumer_plugin_filter(consumer_name)
+    except ValueError as exc:
+        return _error_response(context.request_id, -32602, str(exc))
+    effective_filter = _merge_plugin_filters(plugin_filter, consumer_filter)
+    return _response(context.request_id, result={"tools": _build_tools_list(effective_filter or set())})
 
 
 async def _handle_tools_call(context: McpRequestContext) -> JsonDict:
@@ -329,24 +408,41 @@ async def _dispatch_mcp_request(
 
 @app.get("/healthz")
 def healthz() -> dict[str, Any]:
+    try:
+        default_consumer = _default_consumer_name()
+    except ValueError:
+        default_consumer = "invalid"
     return {
         "status": "ok",
         "service": SERVICE_NAME,
         "version": API_VERSION,
         "protocol_version": MCP_PROTOCOL_VERSION,
         "profile": _profile_name(),
+        "default_consumer": default_consumer or "default",
+        "supported_consumers": sorted(CONSUMER_PLUGIN_FILTERS),
         "tools_count": len(_iter_unique_tools()),
         "plugins": _build_health_plugins(),
     }
 
 
 @app.get("/schema")
-def schema_endpoint() -> dict[str, Any]:
+def schema_endpoint(
+    consumer: str | None = None,
+    plugins: str | None = None,
+    x_mythosaur_consumer: str | None = Header(default=None, alias=CONSUMER_HEADER),
+) -> dict[str, Any]:
     """Export all tool schemas for client generation and validation."""
+    plugin_filter = _parse_plugin_filter(plugins)
+    try:
+        consumer_name = _effective_consumer_name(consumer, x_mythosaur_consumer)
+        consumer_filter = _resolve_consumer_plugin_filter(consumer_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    effective_filter = _merge_plugin_filters(plugin_filter, consumer_filter)
     return {
         "version": API_VERSION,
         "protocol_version": MCP_PROTOCOL_VERSION,
-        "tools": _build_schema_tools(),
+        "tools": _build_schema_tools(effective_filter),
     }
 
 
@@ -356,9 +452,17 @@ async def mcp_endpoint(
     response: Response,
     authorization: str | None = Header(default=None),
     mcp_session_id: str | None = Header(default=None, alias="Mcp-Session-Id"),
+    x_mythosaur_consumer: str | None = Header(default=None, alias=CONSUMER_HEADER),
 ) -> dict[str, Any]:
     token = _require_auth(authorization)
     _check_rate_limit(token[:8])
     _periodic_cleanup()
     context = await _request_context(request)
+    context = McpRequestContext(
+        request_id=context.request_id,
+        method=context.method,
+        params=context.params,
+        consumer_hint=x_mythosaur_consumer,
+        started_at=context.started_at,
+    )
     return await _dispatch_mcp_request(context, response, mcp_session_id)

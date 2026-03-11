@@ -60,9 +60,13 @@ Tool families currently forged here:
 
 The full catalog lives in [docs/catalog.md](docs/catalog.md).
 
-## Shared Skills
+## Skills
 
 Shared skill source-of-truth lives under `skills/shared/*`.
+
+Consumer-specific adapter skills live under `skills/consumers/*`.
+These adapt shared workflows to a specific runtime without moving product-specific
+orchestration into the MCP server.
 
 Export those skills into a local agent environment with:
 
@@ -76,7 +80,26 @@ Or choose a custom target:
 ./scripts/export-skills.sh /path/to/your/agent/skills
 ```
 
+Export shared skills plus the Codex adapter bundle with:
+
+```bash
+./scripts/export-skills.sh --consumer codex
+```
+
 The default export target is `~/.codex/skills/mythosaur`.
+Each export also writes `~/.codex/skills/mythosaur/.export-manifest.json` so you can inspect which
+skills were copied into the bundle and which sibling skills were overwritten in the parent registry.
+
+For IDE-focused deployments, you can also run the server with
+`MYTHOSAUR_TOOLS_DEFAULT_CONSUMER=codex` to default discovery to the lighter remote-execution catalog.
+
+Useful shortcuts:
+
+```bash
+make codex-install
+make codex-smoke
+make codex-up
+```
 
 ## The Waypoints
 

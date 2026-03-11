@@ -85,7 +85,12 @@ Route requests to the Google and NotebookLM tools in `mythosaur-tools`.
 - Gmail draft creation
 - Full-library duplicate scanning across the user's entire personal Google Photos library
 
-## Role Split
+## Standalone Mode
 
-- Grogu: use these tools for quick retrieval and short answers.
-- Mythosaur: use these tools to gather inputs for planning, then write durable project state back into workspace files.
+If Google Workspace or NotebookLM execution is unavailable:
+
+- draft the email, calendar entry, note, or response
+- state what required API action could not be executed
+- gather the fields needed for a later retry or copy-paste completion
+
+Keep the workflow useful even when the execution layer is temporarily unavailable.

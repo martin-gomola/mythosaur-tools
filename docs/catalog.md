@@ -26,6 +26,10 @@ Bot-agnostic skill sources live here:
 - `skills/shared/pii-precommit-check`
 - `skills/shared/google-workspace-router`
 
+Consumer-specific adapter skills live here:
+
+- `skills/consumers/codex/codex-mythosaur-orchestrator`
+
 Skill export path used by local agent environments:
 
 ```bash
@@ -37,6 +41,7 @@ Export the shared skills for Codex, Cursor, or another local agent runtime:
 ```bash
 ./scripts/export-skills.sh
 ./scripts/export-skills.sh /path/to/your/agent/skills
+./scripts/export-skills.sh --consumer codex
 ```
 
 ## Security Defaults

@@ -63,6 +63,12 @@ class TestHealthz:
         assert "service_checks" in google_plugin["auth"]
         assert "maps" in google_plugin["auth"]["service_checks"]
 
+    def test_reports_default_consumer(self, client):
+        resp = client.get("/healthz")
+        body = resp.json()
+        assert body["default_consumer"] == "default"
+        assert "codex" in body["supported_consumers"]
+
 
 class TestSchema:
     def test_returns_tools(self, client):
@@ -86,6 +92,63 @@ class TestSchema:
         resp = client.get("/schema")
         names = [t["name"] for t in resp.json()["tools"]]
         assert names == sorted(names)
+
+    def test_schema_filter_by_consumer_codex(self, client):
+        resp = client.get("/schema?consumer=codex")
+        assert resp.status_code == 200
+        tools = resp.json()["tools"]
+        plugin_ids = {t["plugin_id"] for t in tools}
+        assert "mythosaur.search" in plugin_ids
+        assert "mythosaur.fetch" in plugin_ids
+        assert "mythosaur.filesystem" not in plugin_ids
+        assert "mythosaur.git" not in plugin_ids
+
+    def test_schema_invalid_consumer_returns_400(self, client):
+        resp = client.get("/schema?consumer=unknown")
+        assert resp.status_code == 400
+
+    def test_schema_filter_by_consumer_header(self, client):
+        resp = client.get("/schema", headers={"X-Mythosaur-Consumer": "codex"})
+        assert resp.status_code == 200
+        tools = resp.json()["tools"]
+        plugin_ids = {t["plugin_id"] for t in tools}
+        assert "mythosaur.search" in plugin_ids
+        assert "mythosaur.filesystem" not in plugin_ids
+
+    def test_schema_uses_default_consumer_env(self, monkeypatch):
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_API_KEY", "test-key-123")
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "0")
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_DEFAULT_CONSUMER", "codex")
+
+        from importlib import reload
+        import services.mcp_server.app as app_module
+
+        reload(app_module)
+        env_client = TestClient(app_module.app)
+        resp = env_client.get("/schema")
+        assert resp.status_code == 200
+        plugin_ids = {t["plugin_id"] for t in resp.json()["tools"]}
+        assert "mythosaur.search" in plugin_ids
+        assert "mythosaur.git" not in plugin_ids
+
+    def test_tools_list_consumer_intersects_plugin_filter(self, client):
+        resp = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list",
+                "params": {
+                    "consumer": "codex",
+                    "plugins": "mythosaur.search,mythosaur.fetch,mythosaur.git",
+                },
+            },
+            headers=_auth(),
+        )
+        body = resp.json()
+        tools = body["result"]["tools"]
+        plugin_ids = {t["annotations"]["pluginId"] for t in tools}
+        assert plugin_ids == {"mythosaur.search", "mythosaur.fetch"}
 
 
 class TestMcpAuth:
@@ -139,6 +202,62 @@ class TestMcpToolsList:
         tools = body["result"]["tools"]
         plugin_ids = {t["annotations"]["pluginId"] for t in tools}
         assert plugin_ids == {"mythosaur.time"}
+
+    def test_filter_by_consumer_codex(self, client):
+        resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {"consumer": "codex"}},
+            headers=_auth(),
+        )
+        body = resp.json()
+        tools = body["result"]["tools"]
+        plugin_ids = {t["annotations"]["pluginId"] for t in tools}
+        assert "mythosaur.search" in plugin_ids
+        assert "mythosaur.fetch" in plugin_ids
+        assert "mythosaur.google_workspace" in plugin_ids
+        assert "mythosaur.filesystem" not in plugin_ids
+        assert "mythosaur.git" not in plugin_ids
+
+    def test_invalid_consumer_returns_error(self, client):
+        resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {"consumer": "unknown"}},
+            headers=_auth(),
+        )
+        body = resp.json()
+        assert body["error"]["code"] == -32602
+
+    def test_filter_by_consumer_header(self, client):
+        resp = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+            headers={**_auth(), "X-Mythosaur-Consumer": "codex"},
+        )
+        body = resp.json()
+        tools = body["result"]["tools"]
+        plugin_ids = {t["annotations"]["pluginId"] for t in tools}
+        assert "mythosaur.search" in plugin_ids
+        assert "mythosaur.filesystem" not in plugin_ids
+
+    def test_filter_by_default_consumer_env(self, monkeypatch):
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_API_KEY", "test-key-123")
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "0")
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_DEFAULT_CONSUMER", "codex")
+
+        from importlib import reload
+        import services.mcp_server.app as app_module
+
+        reload(app_module)
+        env_client = TestClient(app_module.app)
+        resp = env_client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+            headers=_auth(),
+        )
+        body = resp.json()
+        plugin_ids = {t["annotations"]["pluginId"] for t in body["result"]["tools"]}
+        assert "mythosaur.fetch" in plugin_ids
+        assert "mythosaur.git" not in plugin_ids
 
 
 class TestMcpToolsCall:

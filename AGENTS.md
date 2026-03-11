@@ -23,6 +23,7 @@ It runs as a Docker stack and exposes tools over HTTP POST at `/mcp`.
 - **Execution logic** (tool handlers, API wrappers, CLI subprocess calls) belongs here.
 - **Orchestration logic** (message loops, skills routing, chat context) belongs in the consuming repo.
 - **Shared skills** (routing policies that decide *when* to call a tool) live in `skills/shared/` and are exported to consumers.
+- **Consumer-specific adapter skills** live in `skills/consumers/` when a runtime needs local routing preferences that are not portable enough for `skills/shared/`.
 - If a capability should work across `mythosaur-ai`, Codex, Cursor, Claude Code, and other MCP consumers, the handler belongs here.
 - **Current boundary**: search, fetch, transcript extraction, browser, Google Workspace, and PII are shared through `mythosaur-tools`.
 - **Intentional exceptions**: workspace filesystem mutation and local git operations stay in `mythosaur-ai` because direct host access is more reliable than Docker-mounted writes for the Nanobot runtime.
@@ -96,7 +97,9 @@ It runs as a Docker stack and exposes tools over HTTP POST at `/mcp`.
 1. Configure `mythosaur-tools` as an MCP server using the local HTTP endpoint.
 2. Point the client to `http://127.0.0.1:8064/mcp` with `Authorization: Bearer <MYTHOSAUR_TOOLS_API_KEY>`.
 3. Set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` in this repo's `.env` to the project the tools should operate on.
-4. Restart the stack after tool or config changes so the client sees the updated catalog.
+4. Export the shared skills plus the Codex adapter bundle with `./scripts/export-skills.sh --consumer codex`.
+5. If the client cannot send a consumer hint during `tools/list`, set `MYTHOSAUR_TOOLS_DEFAULT_CONSUMER=codex` for that instance.
+6. Restart the stack after tool or config changes so the client sees the updated catalog.
 
 ## How Cursor Consumes This Repo
 
@@ -137,6 +140,7 @@ On error: `status: "error"`, `data: {}`, `error: { "code": "...", "message": "..
 | `services/mcp_server/plugins/*_tools.py` | Tool implementations (auto-discovered) |
 | `services/mcp_server/plugins/common.py` | Shared helpers: ToolDef, ok/err, path guards |
 | `skills/shared/` | Shared skill sources exported to consumers |
+| `skills/consumers/` | Consumer-specific adapter skills such as the Codex orchestrator |
 | `scripts/google_oauth_bootstrap.py` | Google OAuth flow for `make google-login` |
 | `docs/integration.md` | Full protocol, auth, env var reference |
 | `docs/notebooklm.md` | NotebookLM setup and tool reference |

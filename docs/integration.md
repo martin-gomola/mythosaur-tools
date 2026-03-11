@@ -36,7 +36,7 @@ curl -sS -X POST "$MCP_URL" \
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
 | `/healthz` | GET | No | Health check with plugin diagnostics |
-| `/schema` | GET | No | Export all tool schemas for client generation |
+| `/schema` | GET | No | Export tool schemas for client generation, optionally filtered by consumer/plugins |
 | `/mcp` | POST | Bearer | JSON-RPC 2.0 MCP endpoint |
 
 ---
@@ -68,7 +68,7 @@ Creates a session. Returns `Mcp-Session-Id` header for subsequent requests.
 
 ### `tools/list`
 
-Returns all registered tools. Supports optional plugin filtering:
+Returns all registered tools. Supports optional plugin filtering and consumer-aware filtering:
 
 ```json
 {
@@ -80,6 +80,31 @@ Returns all registered tools. Supports optional plugin filtering:
   }
 }
 ```
+
+For IDE consumers such as Codex or Cursor, request a lighter remote-execution catalog:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {
+    "consumer": "codex"
+  }
+}
+```
+
+Supported `consumer` values:
+
+- `mythosaur-ai` or `default` for the full catalog
+- `codex`, `cursor`, `claude-code`, or `ide` for the lighter remote-execution catalog
+
+The consumer filter is applied before any explicit plugin list. For example, `consumer=codex`
+plus `plugins=mythosaur.search,mythosaur.fetch` returns only the intersection.
+
+If the client cannot send `consumer` in `tools/list`, the server also accepts the
+`X-Mythosaur-Consumer` header and the instance-wide `MYTHOSAUR_TOOLS_DEFAULT_CONSUMER`
+environment variable as fallbacks.
 
 ### `tools/call`
 
@@ -211,6 +236,14 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 }
 ```
 
+`/schema` also supports the same optional `consumer` and `plugins` filters as `tools/list`.
+For example, `GET /schema?consumer=codex` returns the lighter remote-execution subset intended
+for IDE consumers, while `GET /schema?consumer=codex&plugins=mythosaur.search,mythosaur.fetch`
+returns only the filtered intersection.
+
+Like `tools/list`, `/schema` also accepts `X-Mythosaur-Consumer` and falls back to
+`MYTHOSAUR_TOOLS_DEFAULT_CONSUMER` when no explicit consumer is provided.
+
 ---
 
 ## Environment Variables
@@ -218,6 +251,7 @@ Use `structuredContent` for typed access; `content[0].text` for pass-through.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `MYTHOSAUR_TOOLS_API_KEY` | Yes | — | Bearer token for MCP auth |
+| `MYTHOSAUR_TOOLS_DEFAULT_CONSUMER` | No | — | Optional default consumer profile such as `codex` or `cursor` when a client does not send a consumer hint |
 | `MYTHOSAUR_TOOLS_MCP_PORT` | No | `8064` | HTTP listen port |
 | `MYTHOSAUR_TOOLS_PROFILE` | No | `readonly` | `readonly` or `power` (controls mutating FS tools) |
 | `MYTHOSAUR_TOOLS_WORKSPACE_ROOT` | No | `/workspace` | Root for filesystem/git tools |
@@ -473,10 +507,14 @@ The `/schema` endpoint exports all tool definitions without auth for client code
 Skills in `skills/shared/` are the routing layer that consumers embed. They decide *when* to call
 a tool and *how* to interpret the result. The tool handlers here are the execution layer.
 
+Consumer-specific adapters can live under `skills/consumers/` when a runtime needs a local routing
+layer that should not be treated as bot-agnostic shared knowledge.
+
 Export skills to a consumer:
 
 ```bash
 ./scripts/export-skills.sh /path/to/consumer/skills
+./scripts/export-skills.sh --consumer codex /path/to/consumer/skills
 ```
 
 ---
