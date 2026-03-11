@@ -32,6 +32,8 @@ description: >
 4. If tool is needed, call exactly one MCP tool first.
 5. Call additional tools only when prior output proves it is required.
 6. If request is ambiguous, ask one short clarification instead of broad tool fan-out.
+7. If the task is to turn evidence into a brief, update, or plan, use `evidence-briefing` after selecting the minimal tool set.
+8. If the task is to sort incoming items by urgency or reply need, use `action-triage` after selecting the minimal tool set.
 
 ## Canonical MCP Map
 

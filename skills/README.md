@@ -7,7 +7,9 @@
 - Optional local export helper: `scripts/export-skills.sh`
 
 Current shared skills:
+- `action-triage`
 - `context7`
+- `evidence-briefing`
 - `agent-browser`
 - `architect`
 - `code-quality`

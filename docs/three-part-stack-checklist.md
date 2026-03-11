@@ -43,3 +43,16 @@
 - [x] Added the Codex consumer skill scaffold.
 - [x] Started exporter changes for consumer-specific bundles.
 - [x] Started lighter MCP catalog support for Codex.
+
+## Phase 5: Product-Owned Workflow Skills
+
+- [x] Add a first real product-owned workflow skill in `mythosaur-ai` (`research-brief`).
+- [x] Add a second product-owned workflow skill in `mythosaur-ai` (`status-brief`).
+- [x] Keep both skills useful without MCP by requiring standalone output mode.
+- [x] Add a third high-value Mythosaur-owned workflow skill (`weekly-planning`).
+- [x] Add a fourth Mythosaur-owned workflow skill (`release-prep`).
+- [x] Add a role-scoped Grogu workflow skill for inbox triage (`inbox-triage`).
+- [x] Review shared skills again and extract only the stable reusable parts from these product-owned workflows (`evidence-briefing`).
+- [x] Add a second shared extraction for queue/inbox prioritization (`action-triage`).
+- [x] Add regression coverage to ensure new prompt workflows do not shadow narrower deterministic direct intents.
+- [x] Add regression coverage to ensure product workflows stay bound to the intended role.

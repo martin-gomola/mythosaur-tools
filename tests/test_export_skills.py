@@ -87,3 +87,23 @@ def test_export_overwrites_sibling_skill_and_deduplicates_bundle(tmp_path: Path)
     manifest = json.loads((dest / ".export-manifest.json").read_text(encoding="utf-8"))
     assert manifest["overwritten_sibling_skills"] == ["agent-browser"]
     assert manifest["copied_skills"] == ["agent-browser", "codex-mythosaur-orchestrator"]
+
+
+def test_repo_shared_export_contains_extracted_portable_workflows(tmp_path: Path):
+    dest = tmp_path / "skills"
+
+    subprocess.run(
+        ["bash", str(SCRIPT), str(dest)],
+        check=True,
+        cwd=Path.cwd(),
+        env=os.environ.copy(),
+        capture_output=True,
+        text=True,
+    )
+
+    assert (dest / "evidence-briefing" / "SKILL.md").exists()
+    assert (dest / "action-triage" / "SKILL.md").exists()
+
+    manifest = json.loads((dest / ".export-manifest.json").read_text(encoding="utf-8"))
+    assert "evidence-briefing" in manifest["copied_skills"]
+    assert "action-triage" in manifest["copied_skills"]

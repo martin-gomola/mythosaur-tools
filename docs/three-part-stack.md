@@ -54,6 +54,13 @@ Put logic in `skills/shared/` when it is:
 - useful across `mythosaur-ai`, Codex, Cursor, and similar consumers
 - understandable without direct access to a specific runtime implementation
 
+Extraction gate for moving logic from `mythosaur-ai` into `skills/shared/`:
+
+- keep new workflow logic product-local first
+- extract only after the pattern repeats across at least two product workflows or clearly transfers across consumers
+- extract the reusable workflow skeleton and guardrails, not product-specific triggers, role ownership, or workspace artifact names
+- do not let new prompt workflows shadow deterministic direct intents that already have a narrower runtime path
+
 Put logic in consumer-specific skills when it is:
 
 - an adapter for local tool preference
@@ -67,3 +74,21 @@ Put logic in `mythosaur-tools` when it is:
 - search/fetch/transcript retrieval
 - Google Workspace or NotebookLM integration
 - PII scanning or other shared capability execution
+
+## Implementation Progress
+
+The first article-aligned product workflows now live in `mythosaur-ai`, not in this repo's MCP server:
+
+- `research-brief` keeps research synthesis and judgment in Markdown while using `mythosaur-tools` for search, fetch, and NotebookLM execution
+- `status-brief` keeps weekly/project update structure and reporting judgment in Markdown while using local workspace reads plus Docs/Sheets execution tools when needed
+- `weekly-planning` keeps planning judgment in Markdown while using local workspace reads plus live calendar/Docs reads when capacity or publication matters
+- `release-prep` keeps release-readiness judgment in Markdown while using workspace delivery artifacts plus optional Docs publication
+- `inbox-triage` keeps message prioritization and reply judgment in Markdown while using Gmail execution tools only for inbox reads and explicit send actions
+- `evidence-briefing` now captures the reusable cross-consumer pattern in `skills/shared/`: clarify target, gather minimal evidence, draft first, then publish
+- `action-triage` now captures the reusable cross-consumer triage pattern in `skills/shared/`: sort urgent/action-needed/monitor items, draft first, then send
+
+That is the intended model:
+
+- product-specific workflow knowledge in `mythosaur-ai`
+- portable shared routing in `skills/shared/`
+- execution-only capabilities in `mythosaur-tools`

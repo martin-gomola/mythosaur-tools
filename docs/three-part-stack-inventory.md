@@ -26,10 +26,12 @@ This inventory classifies the current `mythosaur-tools` surface using the 3-part
 
 | Skill | Classification | Keep In | Notes |
 |---|---|---|---|
+| `skills/shared/action-triage` | portable workflow knowledge | `skills/shared/` | Shared queue/inbox triage pattern extracted from product-owned inbox workflows without carrying over product-specific routing. |
 | `skills/shared/agent-browser` | portable workflow knowledge | `skills/shared/` | Runtime-agnostic browser workflow using the bundled CLI wrapper, not the MCP browser tools. |
 | `skills/shared/architect` | portable knowledge | `skills/shared/` | Architecture guidance, not runtime-specific orchestration. |
 | `skills/shared/code-quality` | portable knowledge | `skills/shared/` | Shared review and coding standards. |
 | `skills/shared/context7` | portable workflow knowledge | `skills/shared/` | Teaches when and how to use Context7; execution remains external. |
+| `skills/shared/evidence-briefing` | portable workflow knowledge | `skills/shared/` | Shared evidence-to-brief workflow extracted from Mythosaur-owned research, status, and planning skills. |
 | `skills/shared/google-workspace-router` | portable workflow knowledge | `skills/shared/` | Shared routing and guardrails for Google and NotebookLM tool usage. |
 | `skills/shared/pii-precommit-check` | portable workflow knowledge | `skills/shared/` | Shared commit workflow and blocking behavior built on top of PII execution tools. |
 | `skills/shared/python-patterns` | portable knowledge | `skills/shared/` | Language guidance. |

@@ -69,15 +69,18 @@ Route requests to the Google and NotebookLM tools in `mythosaur-tools`.
 ## Routing Rules
 
 1. Match the request to the narrowest tool above. Prefer read tools before write tools.
-2. For NotebookLM:
+2. For inbox or Gmail triage, use `action-triage` to sort urgent, reply-needed, and monitor-only items before any send action.
+3. For NotebookLM:
    - `notebooklm_list_notebooks` first if the notebook is not clearly identified.
    - `notebooklm_query_notebook` only after you know the target notebook.
    - `notebooklm_create_notebook` + `notebooklm_add_source` to build a knowledge base.
    - `notebooklm_create_studio_content` to generate podcasts, mind maps, slides, etc.
    - `notebooklm_download_artifact` to retrieve generated content.
    - `notebooklm_share` to make notebooks accessible via public or invite link.
-3. Do not guess. If the tool does not return the answer, say the data is missing or unavailable.
-4. If the user asks for a write action that is not yet implemented, say so clearly instead of improvising.
+4. Do not guess. If the tool does not return the answer, say the data is missing or unavailable.
+5. If the user asks for a write action that is not yet implemented, say so clearly instead of improvising.
+6. For Docs or Sheets publication workflows, draft the content first with `evidence-briefing` and only then call the write tool.
+7. For Gmail send actions, draft the reply first with `action-triage` or another explicit drafting workflow and only then call `gmail_send`.
 
 ## Not Yet Available
 
