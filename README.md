@@ -9,6 +9,7 @@ This repository keeps network-facing tools, external integrations, and shared sk
 `mythosaur-tools` is the companion arsenal:
 
 - search, fetch, browser, Google Workspace, NotebookLM, and PII tooling
+- transcript extraction for supported video URLs
 - a single MCP HTTP surface for local runtimes and IDE clients
 - the shared source-of-truth for reusable Mythosaur skills
 
@@ -50,6 +51,7 @@ Tool families currently forged here:
 
 - time and date helpers
 - web search and fetch
+- transcript extraction for supported video URLs
 - browser automation
 - guarded filesystem and git access for the mounted workspace
 - Google Workspace, Google Maps, Google Photos, and NotebookLM tools

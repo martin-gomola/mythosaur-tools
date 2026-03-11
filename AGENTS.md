@@ -24,7 +24,7 @@ It runs as a Docker stack and exposes tools over HTTP POST at `/mcp`.
 - **Orchestration logic** (message loops, skills routing, chat context) belongs in the consuming repo.
 - **Shared skills** (routing policies that decide *when* to call a tool) live in `skills/shared/` and are exported to consumers.
 - If a capability should work across `mythosaur-ai`, Codex, Cursor, Claude Code, and other MCP consumers, the handler belongs here.
-- **Current boundary**: search, fetch, browser, Google Workspace, and PII are shared through `mythosaur-tools`.
+- **Current boundary**: search, fetch, transcript extraction, browser, Google Workspace, and PII are shared through `mythosaur-tools`.
 - **Intentional exceptions**: workspace filesystem mutation and local git operations stay in `mythosaur-ai` because direct host access is more reliable than Docker-mounted writes for the Nanobot runtime.
 
 ## Architecture
@@ -55,6 +55,7 @@ It runs as a Docker stack and exposes tools over HTTP POST at `/mcp`.
 │  │  mythosaur.filesystem  — read/write/list/search files   │ │
 │  │  mythosaur.search      — search/news/images (SearXNG)   │ │
 │  │  mythosaur.fetch       — fetch/json/html/download       │ │
+│  │  mythosaur.transcript  — supported video transcripts    │ │
 │  │  mythosaur.browser     — headless browser automation    │ │
 │  │  mythosaur.google_workspace — Calendar, Gmail, Drive,   │ │
 │  │      Sheets, Docs, Photos, Maps, NotebookLM             │ │

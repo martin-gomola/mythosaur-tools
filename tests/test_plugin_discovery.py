@@ -1,4 +1,4 @@
-from services.mcp_server.plugins import load_tools, PluginMeta
+from services.mcp_server.plugins import load_tools
 
 
 def test_load_tools_returns_tools_and_meta():
@@ -17,6 +17,7 @@ def test_all_plugins_discovered():
         "mythosaur.git",
         "mythosaur.search",
         "mythosaur.fetch",
+        "mythosaur.transcript",
         "mythosaur.filesystem",
         "mythosaur.browser",
         "mythosaur.google_workspace",
