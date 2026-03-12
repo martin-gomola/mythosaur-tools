@@ -120,6 +120,15 @@ This writes:
 
 The goal is simple: keep tool/plugin work packetized, evidence-backed, and easy to resume without recreating the full lane system from `mythosaur-ai`.
 
+As work progresses, update the bundle status and write back evidence:
+
+```bash
+make update-execution-bundle STATUS=in_progress
+python scripts/update_execution_bundle.py --status completed \
+  --evidence "uv run pytest tests/test_execution_bundle.py -q" \
+  --summary "Verification passed"
+```
+
 ## The Waypoints
 
 Start here, then go deeper only if you need the details:

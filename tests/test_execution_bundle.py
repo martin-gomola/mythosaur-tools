@@ -4,12 +4,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
+from workflow.execution_bundle import (
+    ExecutionBundleRequest,
+    ExecutionBundleUpdate,
+    execution_bundle_paths,
+    update_execution_bundle,
+    write_execution_bundle,
+)
 
-from workflow.execution_bundle import ExecutionBundleRequest, execution_bundle_paths, write_execution_bundle
 
-
-def test_write_execution_bundle_creates_expected_files(tmp_path: Path):
+def test_execution_bundle_core_flow(tmp_path: Path):
     written = write_execution_bundle(
         tmp_path,
         ExecutionBundleRequest(
@@ -26,48 +30,59 @@ def test_write_execution_bundle_creates_expected_files(tmp_path: Path):
     assert '"repo": "mythosaur-tools"' in paths["request_packet"].read_text(encoding="utf-8")
     assert "Do not duplicate execution logic" in paths["implementation_contract"].read_text(encoding="utf-8")
 
-
-def test_write_execution_bundle_refuses_to_overwrite_without_force(tmp_path: Path):
-    write_execution_bundle(
+    written = update_execution_bundle(
         tmp_path,
-        ExecutionBundleRequest(
-            title="Initial bundle",
-            summary="Create files once.",
-            focus=("Focus item",),
-            verification=("pytest",),
+        ExecutionBundleUpdate(
+            status="completed",
+            evidence=("uv run pytest tests/test_execution_bundle.py -q passed",),
+            summary=("Completed the execution bundle helper update.",),
         ),
     )
 
-    with pytest.raises(FileExistsError, match="execution bundle already exists"):
-        write_execution_bundle(
-            tmp_path,
-            ExecutionBundleRequest(
-                title="Second bundle",
-                summary="Should fail without force.",
-                focus=("Focus item",),
-                verification=("pytest",),
-            ),
-        )
+    paths = execution_bundle_paths(tmp_path)
+    assert written == [paths["evidence_bundle"], paths["completion_summary"]]
+    evidence = paths["evidence_bundle"].read_text(encoding="utf-8")
+    completion = paths["completion_summary"].read_text(encoding="utf-8")
+    assert "- Status: `completed`" in evidence
+    assert "## Update (completed)" in evidence
+    assert "pytest tests/test_execution_bundle.py -q passed" in evidence
+    assert "## Latest summary (completed)" in completion
+    assert "Completed the execution bundle helper update." in completion
 
 
-def test_init_execution_bundle_script_writes_files(tmp_path: Path):
-    script = Path("scripts/init_execution_bundle.py")
-    result = subprocess.run(
+def test_execution_bundle_cli_flow(tmp_path: Path):
+    init_script = Path("scripts/init_execution_bundle.py")
+    update_script = Path("scripts/update_execution_bundle.py")
+    init_result = subprocess.run(
         [
             sys.executable,
-            str(script),
+            str(init_script),
             "--root",
             str(tmp_path),
             "--title",
             "Add docs contract",
             "--summary",
             "Create a structured bundle for docs work.",
-            "--scope",
-            "docs",
-            "--focus",
-            "Update the README and integration docs.",
-            "--verify",
-            "uv run pytest tests/test_execution_bundle.py -q",
+        ],
+        check=True,
+        cwd=Path.cwd(),
+        capture_output=True,
+        text=True,
+    )
+    assert "artifacts/execution/request-packet.json" in init_result.stdout
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(update_script),
+            "--root",
+            str(tmp_path),
+            "--status",
+            "in_progress",
+            "--evidence",
+            "Updated the README contract wording.",
+            "--summary",
+            "Started the docs execution pass.",
         ],
         check=True,
         cwd=Path.cwd(),
@@ -75,5 +90,7 @@ def test_init_execution_bundle_script_writes_files(tmp_path: Path):
         text=True,
     )
 
-    assert "artifacts/execution/request-packet.json" in result.stdout
-    assert (tmp_path / "artifacts" / "execution" / "completion-summary.md").exists()
+    assert "artifacts/execution/evidence-bundle.md" in result.stdout
+    evidence = (tmp_path / "artifacts" / "execution" / "evidence-bundle.md").read_text(encoding="utf-8")
+    assert "- Status: `in_progress`" in evidence
+    assert "Updated the README contract wording." in evidence

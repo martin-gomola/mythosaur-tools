@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,6 +19,13 @@ class ExecutionBundleRequest:
         "docs/catalog.md",
         "docs/integration.md",
     )
+
+
+@dataclass(frozen=True)
+class ExecutionBundleUpdate:
+    status: str
+    evidence: tuple[str, ...]
+    summary: tuple[str, ...]
 
 
 def execution_bundle_paths(root: Path) -> dict[str, Path]:
@@ -112,5 +120,55 @@ def write_execution_bundle(root: Path, request: ExecutionBundleRequest, *, force
     return written
 
 
+def update_execution_bundle(root: Path, update: ExecutionBundleUpdate) -> list[Path]:
+    paths = execution_bundle_paths(root)
+    request_packet = paths["request_packet"]
+    if not request_packet.exists():
+        raise FileNotFoundError("execution bundle request packet not found; initialize the bundle first")
+
+    packet = json.loads(request_packet.read_text(encoding="utf-8"))
+    title = str(packet.get("title") or "Unknown work item")
+
+    evidence_path = paths["evidence_bundle"]
+    completion_path = paths["completion_summary"]
+    if not evidence_path.exists() or not completion_path.exists():
+        raise FileNotFoundError("execution bundle markdown files not found; initialize the bundle first")
+
+    evidence_content = _replace_status_line(evidence_path.read_text(encoding="utf-8"), update.status)
+    completion_content = _replace_status_line(completion_path.read_text(encoding="utf-8"), update.status)
+
+    evidence_content = _append_markdown_section(
+        evidence_content,
+        heading=f"Update ({update.status})",
+        lines=update.evidence or ("No evidence details recorded.",),
+    )
+    completion_content = _append_markdown_section(
+        completion_content,
+        heading=f"Latest summary ({update.status})",
+        lines=update.summary
+        or (
+            f"{title} moved to `{update.status}`.",
+            "Add a more specific summary on the next update.",
+        ),
+    )
+
+    evidence_path.write_text(evidence_content, encoding="utf-8")
+    completion_path.write_text(completion_content, encoding="utf-8")
+    return [evidence_path, completion_path]
+
+
 def _bullet_lines(items: tuple[str, ...]) -> str:
     return "\n".join(f"- {item}" for item in items)
+
+
+def _replace_status_line(content: str, status: str) -> str:
+    updated, count = re.subn(r"^- Status: `[^`]+`$", f"- Status: `{status}`", content, count=1, flags=re.MULTILINE)
+    if count:
+        return updated
+    return content.rstrip() + f"\n- Status: `{status}`\n"
+
+
+def _append_markdown_section(content: str, *, heading: str, lines: tuple[str, ...]) -> str:
+    body = "\n".join(f"- {line}" for line in lines if line)
+    block = f"## {heading}\n\n{body}\n"
+    return content.rstrip() + "\n\n" + block

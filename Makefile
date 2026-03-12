@@ -4,7 +4,7 @@
 
 .PHONY: help up down restart logs config test commit \
         codex-up codex-install codex-smoke \
-        init-execution-bundle \
+        init-execution-bundle update-execution-bundle \
         google-login google-login-ssh notebooklm-login \
         notebooklm-login-manual _check-env
 
@@ -44,6 +44,7 @@ help:
 	@echo "  Dev:"
 	@echo "    make test            Run backend tests"
 	@echo "    make init-execution-bundle TITLE=... SUMMARY=... [SCOPE=plugin]"
+	@echo "    make update-execution-bundle STATUS=..."
 	@echo "    make codex-install   Export shared + Codex adapter skills"
 	@echo "    make codex-smoke     Verify the Codex consumer catalog"
 	@echo "    make commit          Stage all changes and commit interactively"
@@ -85,6 +86,13 @@ init-execution-bundle:
 		exit 1; \
 	fi
 	@$(UV) run python scripts/init_execution_bundle.py --title "$(TITLE)" --summary "$(SUMMARY)" --scope "$(or $(SCOPE),plugin)"
+
+update-execution-bundle:
+	@if [ -z "$(STATUS)" ]; then \
+		echo "Usage: make update-execution-bundle STATUS='completed|blocked|failed|in_progress|pending'"; \
+		exit 1; \
+	fi
+	@$(UV) run python scripts/update_execution_bundle.py --status "$(STATUS)"
 
 codex-install:
 	@bash ./scripts/export-skills.sh --consumer codex
