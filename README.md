@@ -68,27 +68,28 @@ Consumer-specific adapter skills live under `skills/consumers/*`.
 These adapt shared workflows to a specific runtime without moving product-specific
 orchestration into the MCP server.
 
-Export those skills into a local agent environment with:
+Export shared skills into a local agent environment:
 
 ```bash
 ./scripts/export-skills.sh
+```
+
+Export shared skills plus a consumer-specific bundle (default destination depends on consumer):
+
+```bash
+./scripts/export-skills.sh --consumer codex   # → ~/.codex/skills/mythosaur
+./scripts/export-skills.sh --consumer cursor  # → ~/.cursor/skills/mythosaur
 ```
 
 Or choose a custom target:
 
 ```bash
 ./scripts/export-skills.sh /path/to/your/agent/skills
+./scripts/export-skills.sh --consumer cursor /path/to/cursor/skills/mythosaur
 ```
 
-Export shared skills plus the Codex adapter bundle with:
-
-```bash
-./scripts/export-skills.sh --consumer codex
-```
-
-The default export target is `~/.codex/skills/mythosaur`.
-Each export also writes `~/.codex/skills/mythosaur/.export-manifest.json` so you can inspect which
-skills were copied into the bundle and which sibling skills were overwritten in the parent registry.
+Each export writes `.export-manifest.json` in the destination so you can inspect which
+skills were copied and which sibling skills were overwritten in the parent registry.
 
 For IDE-focused deployments, you can also run the server with
 `MYTHOSAUR_TOOLS_DEFAULT_CONSUMER=codex` to default discovery to the lighter remote-execution catalog.

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="${MYTHOSAUR_SHARED_SKILLS_DIR:-$ROOT_DIR/skills/shared}"
 CONSUMERS_DIR="${MYTHOSAUR_CONSUMER_SKILLS_DIR:-$ROOT_DIR/skills/consumers}"
-DEST_DIR="${MYTHOSAUR_SKILLS_EXPORT_DIR:-$HOME/.codex/skills/mythosaur}"
+DEST_DIR=""
 CONSUMER=""
 DEST_SET=0
 OVERWRITTEN_SKILLS=()
@@ -16,12 +16,19 @@ usage() {
 Usage:
   ./scripts/export-skills.sh [DEST_DIR]
   ./scripts/export-skills.sh --consumer codex [DEST_DIR]
+  ./scripts/export-skills.sh --consumer cursor [DEST_DIR]
 
 Exports shared skills by default. When --consumer is set, exports shared skills
 plus the matching consumer-specific bundle into the same destination.
 
-If the destination is nested under a skills registry root such as
-`~/.codex/skills/mythosaur`, any skill that already exists as a sibling in the
+Default destination by consumer:
+  codex   → ~/.codex/skills/mythosaur
+  cursor  → ~/.cursor/skills/mythosaur
+
+Override with MYTHOSAUR_SKILLS_EXPORT_DIR or a positional DEST_DIR.
+
+If the destination is nested under a skills registry root (e.g. ~/.codex/skills
+or ~/.cursor/skills), any skill that already exists as a sibling in the
 registry is replaced there and not duplicated under the bundle directory.
 EOF
 }
@@ -125,6 +132,17 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+# Default destination by consumer when not set explicitly
+if [[ "$DEST_SET" -eq 0 ]]; then
+  if [[ -n "${MYTHOSAUR_SKILLS_EXPORT_DIR:-}" ]]; then
+    DEST_DIR="$MYTHOSAUR_SKILLS_EXPORT_DIR"
+  elif [[ "$CONSUMER" == "cursor" ]]; then
+    DEST_DIR="$HOME/.cursor/skills/mythosaur"
+  else
+    DEST_DIR="$HOME/.codex/skills/mythosaur"
+  fi
+fi
 
 if [[ ! -d "$SRC_DIR" ]]; then
   echo "ERROR: shared skills source not found: $SRC_DIR" >&2
