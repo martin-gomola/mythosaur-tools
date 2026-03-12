@@ -1,7 +1,11 @@
+import asyncio
 import os
 
 import pytest
 from fastapi.testclient import TestClient
+from services.mcp_server.plugins import load_tools
+from services.mcp_server.plugins.search_tools import get_tools as get_search_tools
+from services.mcp_server.plugins.time_tools import get_tools as get_time_tools
 
 
 @pytest.fixture(autouse=True)
@@ -44,6 +48,24 @@ def _assert_codex_catalog(plugin_ids: set[str]) -> None:
     assert "mythosaur.google_workspace" in plugin_ids
     assert "mythosaur.filesystem" not in plugin_ids
     assert "mythosaur.git" not in plugin_ids
+
+
+def _run(coro):
+    return asyncio.new_event_loop().run_until_complete(coro)
+
+
+def _search_tool(name: str):
+    for t in get_search_tools():
+        if t.name == name:
+            return t
+    raise AssertionError(f"tool not found: {name}")
+
+
+def _time_tool(name: str):
+    for t in get_time_tools():
+        if t.name == name:
+            return t
+    raise AssertionError(f"tool not found: {name}")
 
 
 class TestHealthz:
@@ -377,3 +399,87 @@ class TestRateLimiting:
             headers=_auth(),
         )
         assert resp.status_code == 429
+
+
+def test_load_tools_returns_tools_and_meta():
+    tools, meta = load_tools()
+    assert isinstance(tools, dict)
+    assert isinstance(meta, list)
+    assert len(tools) > 0
+    assert len(meta) > 0
+
+
+def test_all_plugins_discovered():
+    _, meta = load_tools()
+    plugin_ids = {m.plugin_id for m in meta}
+    expected = {
+        "mythosaur.time",
+        "mythosaur.git",
+        "mythosaur.search",
+        "mythosaur.fetch",
+        "mythosaur.transcript",
+        "mythosaur.filesystem",
+        "mythosaur.browser",
+        "mythosaur.google_workspace",
+        "mythosaur.pii",
+    }
+    assert expected == plugin_ids
+
+
+def test_aliases_resolve_to_same_tool():
+    tools, _ = load_tools()
+    if "osaurus.current_time" in tools:
+        assert tools["osaurus.current_time"] is tools["current_time"]
+
+
+def test_plugin_meta_has_correct_counts():
+    _, meta = load_tools()
+    for meta_item in meta:
+        assert meta_item.tool_count == len(meta_item.tool_names)
+        assert meta_item.tool_count > 0
+
+
+def test_search_missing_query():
+    payload = _run(_search_tool("search").handler({}))
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "missing_query"
+
+
+def test_search_no_searxng_url(monkeypatch):
+    monkeypatch.delenv("MYTHOSAUR_TOOLS_SEARXNG_URL", raising=False)
+    payload = _run(_search_tool("search").handler({"query": "test"}))
+    assert payload["status"] == "error"
+    assert "not configured" in payload["error"]["message"]
+
+
+def test_search_news_missing_query():
+    payload = _run(_search_tool("search_news").handler({}))
+    assert payload["status"] == "error"
+
+
+def test_search_images_missing_query():
+    payload = _run(_search_tool("search_images").handler({}))
+    assert payload["status"] == "error"
+
+
+def test_all_search_tools_are_async():
+    for tool in get_search_tools():
+        assert tool.is_async is True, f"{tool.name} should be async"
+
+
+def test_search_max_results_bounds():
+    payload = _run(_search_tool("search").handler({"query": "test", "max_results": 999}))
+    assert payload["status"] == "error"
+
+
+def test_current_time_ok():
+    payload = _time_tool("current_time").handler({"timezone": "UTC"})
+    assert payload["status"] == "ok"
+    assert payload["tool"] == "current_time"
+    assert "iso" in payload["data"]
+
+
+def test_format_date_error_missing_input():
+    payload = _time_tool("format_date").handler({})
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "missing_input"

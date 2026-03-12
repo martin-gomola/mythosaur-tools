@@ -4,11 +4,20 @@ from pathlib import Path
 import pytest
 
 import services.mcp_server.plugins.fetch_tools as fetch_tools
+from services.mcp_server.plugins.common import resolve_under_base, validate_fetch_url
+from services.mcp_server.plugins.filesystem_tools import get_tools as get_filesystem_tools
 from services.mcp_server.plugins.fetch_tools import get_tools
 
 
 def _tool(name: str):
     for t in get_tools():
+        if t.name == name:
+            return t
+    raise AssertionError(f"tool not found: {name}")
+
+
+def _filesystem_tool(name: str):
+    for t in get_filesystem_tools():
         if t.name == name:
             return t
     raise AssertionError(f"tool not found: {name}")
@@ -119,3 +128,52 @@ def test_download_ssrf_blocked(tmp_path: Path, monkeypatch):
 def test_all_fetch_tools_are_async():
     for tool in get_tools():
         assert tool.is_async is True, f"{tool.name} should be async"
+
+
+def test_resolve_under_base_rejects_escape(tmp_path):
+    with pytest.raises(ValueError):
+        resolve_under_base("../outside", tmp_path)
+
+
+def test_resolve_under_base_allows_relative_child(tmp_path):
+    resolved = resolve_under_base("docs/file.txt", tmp_path)
+    assert resolved == (tmp_path / "docs" / "file.txt").resolve(strict=False)
+
+
+@pytest.mark.parametrize(
+    ("url", "error_pattern"),
+    [
+        ("file:///etc/passwd", "scheme not allowed"),
+        ("ftp://host/data", "scheme not allowed"),
+        ("http://localhost/admin", "localhost"),
+        ("http://127.0.0.1/secret", "blocked"),
+        ("http://10.0.0.1/internal", "blocked"),
+        ("http://192.168.1.1/admin", "blocked"),
+        ("http://169.254.169.254/metadata", "blocked"),
+        ("http://[::1]/admin", "blocked"),
+        ("http:///path", "no hostname"),
+    ],
+)
+def test_validate_fetch_url_rejects_blocked_targets(url, error_pattern):
+    with pytest.raises(ValueError, match=error_pattern):
+        validate_fetch_url(url)
+
+
+def test_validate_fetch_url_allows_public_targets():
+    validate_fetch_url("https://example.com/page")
+    validate_fetch_url("http://example.com/page")
+    validate_fetch_url("https://8.8.8.8/dns")
+
+
+def test_read_file_workspace_guard(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_WORKSPACE_ROOT", str(tmp_path))
+    payload = _filesystem_tool("read_file").handler({"path": "../outside.txt"})
+    assert payload["status"] == "error"
+
+
+def test_write_file_blocked_in_readonly(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setenv("MYTHOSAUR_TOOLS_PROFILE", "readonly")
+    payload = _filesystem_tool("write_file").handler({"path": "a.txt", "content": "x"})
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "forbidden"
