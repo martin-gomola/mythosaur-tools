@@ -1,3 +1,8 @@
+import sys
+import types
+
+import pytest
+
 from services.mcp_server.plugins.google_tools import _auth as auth
 from services.mcp_server.plugins.google_tools import _calendar as cal
 from services.mcp_server.plugins.google_tools import _gmail as gmail
@@ -379,7 +384,8 @@ def test_google_drive_upload_file(monkeypatch, tmp_path):
     monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _DriveService())
     monkeypatch.setenv("MYTHOSAUR_TOOLS_WORKSPACE_ROOT", str(tmp_path))
-    monkeypatch.setattr("googleapiclient.http.MediaFileUpload", _MediaFileUpload)
+    monkeypatch.setitem(sys.modules, "googleapiclient", types.SimpleNamespace(http=types.SimpleNamespace()))
+    monkeypatch.setitem(sys.modules, "googleapiclient.http", types.SimpleNamespace(MediaFileUpload=_MediaFileUpload))
     sample = tmp_path / "sample.txt"
     sample.write_text("hello world", encoding="utf-8")
 
@@ -393,7 +399,12 @@ def test_google_drive_upload_file(monkeypatch, tmp_path):
 def test_google_drive_create_text_file(monkeypatch):
     monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _DriveService())
-    monkeypatch.setattr("googleapiclient.http.MediaInMemoryUpload", _MediaInMemoryUpload)
+    monkeypatch.setitem(sys.modules, "googleapiclient", types.SimpleNamespace(http=types.SimpleNamespace()))
+    monkeypatch.setitem(
+        sys.modules,
+        "googleapiclient.http",
+        types.SimpleNamespace(MediaInMemoryUpload=_MediaInMemoryUpload),
+    )
 
     result = drive._drive_create_text_file({"file_name": "briefing.md", "content": "# Daily briefing"})
 
@@ -730,72 +741,72 @@ def test_google_capability_guard(monkeypatch):
     assert result["error"]["code"] == "capability_disabled"
 
 
-def test_gmail_send_rejects_invalid_email(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", "true")
-    result = gmail._gmail_send(
-        {"to": ["not-an-email"], "subject": "Hello", "body_text": "test"}
-    )
+@pytest.mark.parametrize(
+    ("setup", "call", "error_code"),
+    [
+        (
+            lambda monkeypatch: monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", "true"),
+            lambda: gmail._gmail_send({"to": ["not-an-email"], "subject": "Hello", "body_text": "test"}),
+            "invalid_email",
+        ),
+        (
+            lambda monkeypatch: (
+                monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", "true"),
+                monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _GmailService()),
+            ),
+            lambda: gmail._gmail_send(
+                {
+                    "to": ["person@example.com"],
+                    "subject": "Hello",
+                    "body_html": '<div><script>alert("xss")</script></div>',
+                }
+            ),
+            "unsafe_html",
+        ),
+        (
+            lambda monkeypatch: None,
+            lambda: cal._calendar_events({"time_min": "not-a-date", "time_max": "2026-03-07T00:00:00Z"}),
+            "invalid_timestamp",
+        ),
+        (
+            lambda monkeypatch: monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED", "true"),
+            lambda: cal._calendar_create_event(
+                {
+                    "summary": "Test",
+                    "start_time": "2026-03-09T08:00:00Z",
+                    "end_time": "2026-03-09T09:00:00Z",
+                    "attendees": ["bad-email"],
+                }
+            ),
+            "invalid_email",
+        ),
+        (
+            lambda monkeypatch: None,
+            lambda: gmail._gmail_unread({"label_ids": [f"label{i}" for i in range(25)]}),
+            "too_many_labels",
+        ),
+        (
+            lambda monkeypatch: monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _DriveService()),
+            lambda: drive._drive_recent_files({"query": "x" * 1001}),
+            "query_too_long",
+        ),
+        (
+            lambda monkeypatch: monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", "true"),
+            lambda: drive._drive_create_text_file({"file_name": "big.txt", "content": "x" * (10 * 1024 * 1024 + 1)}),
+            "content_too_large",
+        ),
+        (
+            lambda monkeypatch: monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED", "true"),
+            lambda: docs._docs_create({"title": "Big Doc", "content": "x" * (10 * 1024 * 1024 + 1)}),
+            "content_too_large",
+        ),
+    ],
+)
+def test_google_workspace_validation_guards(monkeypatch, setup, call, error_code):
+    setup(monkeypatch)
+    result = call()
     assert result["status"] == "error"
-    assert result["error"]["code"] == "invalid_email"
-
-
-def test_gmail_send_rejects_unsafe_html(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", "true")
-    monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _GmailService())
-    result = gmail._gmail_send(
-        {"to": ["person@example.com"], "subject": "Hello", "body_html": '<div><script>alert("xss")</script></div>'}
-    )
-    assert result["status"] == "error"
-    assert result["error"]["code"] == "unsafe_html"
-
-
-def test_calendar_events_rejects_bad_timestamp():
-    result = cal._calendar_events({"time_min": "not-a-date", "time_max": "2026-03-07T00:00:00Z"})
-    assert result["status"] == "error"
-    assert result["error"]["code"] == "invalid_timestamp"
-
-
-def test_calendar_create_event_validates_attendee_emails(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED", "true")
-    result = cal._calendar_create_event(
-        {
-            "summary": "Test",
-            "start_time": "2026-03-09T08:00:00Z",
-            "end_time": "2026-03-09T09:00:00Z",
-            "attendees": ["bad-email"],
-        }
-    )
-    assert result["status"] == "error"
-    assert result["error"]["code"] == "invalid_email"
-
-
-def test_gmail_label_ids_limit():
-    result = gmail._gmail_unread({"label_ids": [f"label{i}" for i in range(25)]})
-    assert result["status"] == "error"
-    assert result["error"]["code"] == "too_many_labels"
-
-
-def test_drive_query_length_limit(monkeypatch):
-    monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _DriveService())
-    result = drive._drive_recent_files({"query": "x" * 1001})
-    assert result["status"] == "error"
-    assert result["error"]["code"] == "query_too_long"
-
-
-def test_drive_create_text_file_content_size_limit(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", "true")
-    large_content = "x" * (10 * 1024 * 1024 + 1)
-    result = drive._drive_create_text_file({"file_name": "big.txt", "content": large_content})
-    assert result["status"] == "error"
-    assert result["error"]["code"] == "content_too_large"
-
-
-def test_docs_create_content_size_limit(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED", "true")
-    large_content = "x" * (10 * 1024 * 1024 + 1)
-    result = docs._docs_create({"title": "Big Doc", "content": large_content})
-    assert result["status"] == "error"
-    assert result["error"]["code"] == "content_too_large"
+    assert result["error"]["code"] == error_code
 
 
 def test_get_tools_returns_all():
