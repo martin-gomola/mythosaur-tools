@@ -18,34 +18,20 @@ def _run(coro):
     return asyncio.new_event_loop().run_until_complete(coro)
 
 
-def test_fetch_missing_url():
-    payload = _run(_tool("fetch").handler({}))
+@pytest.mark.parametrize(
+    ("tool_name", "arguments", "error_code"),
+    [
+        ("fetch", {}, "missing_url"),
+        ("fetch_json", {}, "missing_url"),
+        ("fetch_html", {}, "missing_url"),
+        ("extract_content", {}, "missing_url"),
+        ("download", {}, "missing_input"),
+    ],
+)
+def test_fetch_tools_validate_required_arguments(tool_name, arguments, error_code):
+    payload = _run(_tool(tool_name).handler(arguments))
     assert payload["status"] == "error"
-    assert payload["error"]["code"] == "missing_url"
-
-
-def test_fetch_json_missing_url():
-    payload = _run(_tool("fetch_json").handler({}))
-    assert payload["status"] == "error"
-    assert payload["error"]["code"] == "missing_url"
-
-
-def test_fetch_html_missing_url():
-    payload = _run(_tool("fetch_html").handler({}))
-    assert payload["status"] == "error"
-    assert payload["error"]["code"] == "missing_url"
-
-
-def test_extract_content_missing_url():
-    payload = _run(_tool("extract_content").handler({}))
-    assert payload["status"] == "error"
-    assert payload["error"]["code"] == "missing_url"
-
-
-def test_download_missing_input():
-    payload = _run(_tool("download").handler({}))
-    assert payload["status"] == "error"
-    assert payload["error"]["code"] == "missing_input"
+    assert payload["error"]["code"] == error_code
 
 
 def test_download_path_escape(tmp_path: Path, monkeypatch):
