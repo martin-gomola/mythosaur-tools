@@ -4,6 +4,7 @@
 
 .PHONY: help up down restart logs config test commit \
         codex-up codex-install codex-smoke \
+        init-execution-bundle \
         google-login google-login-ssh notebooklm-login \
         notebooklm-login-manual _check-env
 
@@ -42,6 +43,7 @@ help:
 	@echo ""
 	@echo "  Dev:"
 	@echo "    make test            Run backend tests"
+	@echo "    make init-execution-bundle TITLE=... SUMMARY=... [SCOPE=plugin]"
 	@echo "    make codex-install   Export shared + Codex adapter skills"
 	@echo "    make codex-smoke     Verify the Codex consumer catalog"
 	@echo "    make commit          Stage all changes and commit interactively"
@@ -76,6 +78,13 @@ config: _check-env
 
 test:
 	@$(UV) run --with-requirements services/mcp_server/requirements.txt python -m pytest tests/test_google_workspace_tools.py tests/test_app.py
+
+init-execution-bundle:
+	@if [ -z "$(TITLE)" ] || [ -z "$(SUMMARY)" ]; then \
+		echo "Usage: make init-execution-bundle TITLE='...' SUMMARY='...' [SCOPE=plugin]"; \
+		exit 1; \
+	fi
+	@$(UV) run python scripts/init_execution_bundle.py --title "$(TITLE)" --summary "$(SUMMARY)" --scope "$(or $(SCOPE),plugin)"
 
 codex-install:
 	@bash ./scripts/export-skills.sh --consumer codex

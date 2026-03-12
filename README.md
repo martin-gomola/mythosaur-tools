@@ -101,6 +101,25 @@ make codex-smoke
 make codex-up
 ```
 
+## Structured Delivery Bundle
+
+For nontrivial plugin, shared-skill, infra, or docs work, initialize a local execution bundle:
+
+```bash
+make init-execution-bundle TITLE="Add fetch retry guard" SUMMARY="Keep retry behavior explicit and tested"
+```
+
+This writes:
+
+- `artifacts/execution/request-packet.json`
+- `artifacts/execution/implementation-contract.md`
+- `artifacts/execution/verification-plan.md`
+- `artifacts/execution/evidence-bundle.md`
+- `artifacts/execution/completion-summary.md`
+- `docs/architecture-decisions.md`
+
+The goal is simple: keep tool/plugin work packetized, evidence-backed, and easy to resume without recreating the full lane system from `mythosaur-ai`.
+
 ## The Waypoints
 
 Start here, then go deeper only if you need the details:
