@@ -46,8 +46,14 @@ Available today in `mythosaur-tools`:
 - `notebooklm_auth_status`
 - `notebooklm_list_notebooks`
 - `notebooklm_query_notebook`
+- `notebooklm_create_notebook`
+- `notebooklm_list_sources`
+- `notebooklm_add_source`
+- `notebooklm_create_studio_content`
+- `notebooklm_download_artifact`
+- `notebooklm_share`
 
-These now cover the first clean write layer for Gmail, Drive, Sheets, Docs, and app-created Google Photos albums/media, plus direct text-file creation in Drive and both Google Maps link builders and API-backed itinerary primitives. NotebookLM creation flows are still pending.
+These now cover the first clean write layer for Gmail, Drive, Sheets, Docs, and app-created Google Photos albums/media, plus direct text-file creation in Drive, both Google Maps link builders and API-backed itinerary primitives, and the current NotebookLM notebook/source/studio flows exposed by the CLI wrapper.
 
 ## Runtime Capability Flags
 
@@ -68,6 +74,8 @@ Current env-backed capability flags:
 - `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED`
 - `MYTHOSAUR_TOOLS_GOOGLE_DOCS_READ_ENABLED`
 - `MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED`
+- `MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_READ_ENABLED`
+- `MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED`
 - `MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED`
 - `MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED`
 
@@ -84,6 +92,7 @@ Recommended UI sections:
 - Drive
 - Sheets
 - Docs
+- Photos
 - Maps
 - NotebookLM
 
