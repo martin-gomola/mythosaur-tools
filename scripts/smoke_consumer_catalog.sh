@@ -4,16 +4,22 @@ set -euo pipefail
 consumer="${1:-codex}"
 mode="${2:-query}"
 
-api_key="${MYTHOSAUR_TOOLS_API_KEY:-}"
+api_key="${MT_API_KEY:-${MYTHOSAUR_TOOLS_API_KEY:-}}"
 if [[ -z "$api_key" && -f .env ]]; then
-  api_key="$(awk -F= '/^MYTHOSAUR_TOOLS_API_KEY=/{print substr($0,index($0,"=")+1)}' .env | tail -n1)"
+  api_key="$(
+    awk -F= '
+      /^MT_API_KEY=/{value=substr($0,index($0,"=")+1)}
+      /^MYTHOSAUR_TOOLS_API_KEY=/{legacy=substr($0,index($0,"=")+1)}
+      END { print value ? value : legacy }
+    ' .env | tail -n1
+  )"
 fi
 if [[ -z "$api_key" ]]; then
-  echo "ERROR: MYTHOSAUR_TOOLS_API_KEY is not set and could not be read from .env" >&2
+  echo "ERROR: MT_API_KEY is not set and could not be read from .env" >&2
   exit 1
 fi
 
-base_url="http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}"
+base_url="http://127.0.0.1:${MT_MCP_PORT:-${MYTHOSAUR_TOOLS_MCP_PORT:-8064}}"
 schema_url="$base_url/schema"
 mcp_url="$base_url/mcp"
 

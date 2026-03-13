@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Final
 
-from .common import JsonDict, ToolDef, bool_env, err, now_ms, ok, parse_int
+from .common import JsonDict, ToolDef, bool_env, env_get, err, now_ms, ok, parse_int
 
 PLUGIN_ID: Final = "mythosaur.google_workspace"
 PLUGIN_SOURCE: Final = "notebooklm"
@@ -18,24 +18,24 @@ DEFAULT_TIMEOUT_SECONDS: Final = 120
 
 
 def _tool_bin() -> str:
-    return (os.getenv("MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN") or DEFAULT_TOOL_BIN).strip() or DEFAULT_TOOL_BIN
+    return (env_get("MT_NOTEBOOKLM_BIN", DEFAULT_TOOL_BIN) or DEFAULT_TOOL_BIN).strip() or DEFAULT_TOOL_BIN
 
 
 def _storage_dir() -> Path:
-    raw = (os.getenv("NOTEBOOKLM_MCP_CLI_PATH") or DEFAULT_STORAGE_DIR).strip() or DEFAULT_STORAGE_DIR
+    raw = (env_get("MT_NOTEBOOKLM_MCP_CLI_PATH", DEFAULT_STORAGE_DIR) or DEFAULT_STORAGE_DIR).strip() or DEFAULT_STORAGE_DIR
     return Path(raw)
 
 
 def _default_profile() -> str:
-    return (os.getenv("MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE") or DEFAULT_PROFILE).strip() or DEFAULT_PROFILE
+    return (env_get("MT_NOTEBOOKLM_PROFILE", DEFAULT_PROFILE) or DEFAULT_PROFILE).strip() or DEFAULT_PROFILE
 
 
 def _default_timeout() -> int:
-    return parse_int(os.getenv("MYTHOSAUR_TOOLS_NOTEBOOKLM_TIMEOUT"), DEFAULT_TIMEOUT_SECONDS, minimum=10, maximum=600)
+    return parse_int(env_get("MT_NOTEBOOKLM_TIMEOUT"), DEFAULT_TIMEOUT_SECONDS, minimum=10, maximum=600)
 
 
 def _notebooklm_enabled() -> bool:
-    return bool_env("MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED", True)
+    return bool_env("MT_NOTEBOOKLM_ENABLED", True)
 
 
 def _enabled_guard(tool_name: str, started: int) -> JsonDict | None:

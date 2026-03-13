@@ -4,19 +4,19 @@
 
 ```bash
 cp .env.example .env
-# set MYTHOSAUR_TOOLS_API_KEY
+# set MT_API_KEY
 # Default internal search endpoint is bundled in this stack: http://searxng-cache:8080
 
 docker compose up -d --build
-curl -s http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}/healthz | jq
-curl -s "http://127.0.0.1:${MYTHOSAUR_TOOLS_SEARXNG_PORT:-8063}/search?q=healthcheck&format=json" | jq '.results | length'
+curl -s http://127.0.0.1:${MT_MCP_PORT:-8064}/healthz | jq
+curl -s "http://127.0.0.1:${MT_SEARXNG_PORT:-8063}/search?q=healthcheck&format=json" | jq '.results | length'
 ```
 
 ## MCP Test
 
 ```bash
-API_KEY="${MYTHOSAUR_TOOLS_API_KEY}"
-MCP_URL="http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}/mcp"
+API_KEY="${MT_API_KEY}"
+MCP_URL="http://127.0.0.1:${MT_MCP_PORT:-8064}/mcp"
 
 curl -sS -X POST "$MCP_URL" \
   -H "Authorization: Bearer $API_KEY" \
@@ -46,7 +46,7 @@ curl -sS -X POST "$MCP_URL" \
 All `/mcp` requests require a `Bearer` token in the `Authorization` header.
 
 ```
-Authorization: Bearer <MYTHOSAUR_TOOLS_API_KEY>
+Authorization: Bearer <MT_API_KEY>
 ```
 
 ---
@@ -54,7 +54,7 @@ Authorization: Bearer <MYTHOSAUR_TOOLS_API_KEY>
 ## Rate Limiting
 
 The server enforces a per-key sliding-window rate limit (default: 120 calls / 60s).
-Configure via `MYTHOSAUR_TOOLS_RATE_LIMIT` env var. Set to `0` to disable.
+Configure via `MT_RATE_LIMIT` env var. Set to `0` to disable.
 
 When exceeded, the server returns HTTP 429.
 
@@ -103,7 +103,7 @@ The consumer filter is applied before any explicit plugin list. For example, `co
 plus `plugins=mythosaur.search,mythosaur.fetch` returns only the intersection.
 
 If the client cannot send `consumer` in `tools/list`, the server also accepts the
-`X-Mythosaur-Consumer` header and the instance-wide `MYTHOSAUR_TOOLS_DEFAULT_CONSUMER`
+`X-Mythosaur-Consumer` header and the instance-wide `MT_DEFAULT_CONSUMER`
 environment variable as fallbacks.
 
 ### `tools/call`
@@ -144,7 +144,7 @@ Every tool handler returns a consistent JSON envelope. Consumers should rely on 
   "data": {},
   "error": {
     "code": "search_failed",
-    "message": "MYTHOSAUR_TOOLS_SEARXNG_URL is not configured"
+    "message": "MT_SEARXNG_URL is not configured"
   },
   "meta": {
     "duration_ms": 1,
@@ -242,51 +242,54 @@ for IDE consumers, while `GET /schema?consumer=codex&plugins=mythosaur.search,my
 returns only the filtered intersection.
 
 Like `tools/list`, `/schema` also accepts `X-Mythosaur-Consumer` and falls back to
-`MYTHOSAUR_TOOLS_DEFAULT_CONSUMER` when no explicit consumer is provided.
+`MT_DEFAULT_CONSUMER` when no explicit consumer is provided.
 
 ---
 
 ## Environment Variables
 
+`MT_*` is the canonical public env contract. The server still accepts the older
+`MYTHOSAUR_TOOLS_*` names as runtime fallbacks during migration.
+
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `MYTHOSAUR_TOOLS_API_KEY` | Yes | — | Bearer token for MCP auth |
-| `MYTHOSAUR_TOOLS_DEFAULT_CONSUMER` | No | — | Optional default consumer profile such as `codex` or `cursor` when a client does not send a consumer hint |
-| `MYTHOSAUR_TOOLS_MCP_PORT` | No | `8064` | HTTP listen port |
-| `MYTHOSAUR_TOOLS_PROFILE` | No | `readonly` | `readonly` or `power` (controls mutating FS tools) |
-| `MYTHOSAUR_TOOLS_WORKSPACE_ROOT` | No | `/workspace` | Root for filesystem/git tools |
-| `MYTHOSAUR_TOOLS_PII_ROOT` | No | `MYTHOSAUR_TOOLS_WORKSPACE_ROOT` | Base dir for PII repo scans and hook installs |
-| `MYTHOSAUR_TOOLS_PII_SCRIPT_PATH` | No | `scripts/pii_scan.py` in repo root | Local CLI script used by installed pre-commit hooks |
-| `MYTHOSAUR_TOOLS_SEARXNG_PORT` | No | `8063` | Host port for bundled `searxng-cache` |
-| `MYTHOSAUR_TOOLS_SEARXNG_URL` | No | `http://searxng-cache:8080` | SearXNG endpoint for search tools |
-| `MYTHOSAUR_TOOLS_SEARXNG_TOKEN` | No | — | Optional SearXNG auth token |
-| `MYTHOSAUR_TOOLS_BROWSER_ENABLED` | No | `false` | Enable browser tools |
-| `MYTHOSAUR_TOOLS_BROWSER_HEADLESS` | No | `true` | Run browser headless |
-| `MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE` | No | `/secrets/google-credentials.json` | Google OAuth client credentials file |
-| `MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE` | No | `/secrets/google-token.json` | Google OAuth authorized user token file |
-| `MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_READ_ENABLED` | No | `true` | Allow calendar read tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED` | No | `false` | Allow calendar event creation |
-| `MYTHOSAUR_TOOLS_GOOGLE_GMAIL_READ_ENABLED` | No | `true` | Allow Gmail read tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED` | No | `false` | Allow Gmail send tool |
-| `MYTHOSAUR_TOOLS_GOOGLE_DRIVE_READ_ENABLED` | No | `true` | Allow Drive read tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED` | No | `false` | Allow Drive write tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_READ_ENABLED` | No | `true` | Allow Sheets read tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED` | No | `false` | Allow Sheets write tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_DOCS_READ_ENABLED` | No | `true` | Allow Google Docs read tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED` | No | `false` | Allow Google Docs create/write tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_READ_ENABLED` | No | `false` | Allow Google Photos app-created read tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED` | No | `false` | Allow Google Photos app-created write tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED` | No | `true` | Allow Google Maps tools |
-| `MYTHOSAUR_TOOLS_GOOGLE_MAPS_NAVIGATE_DEFAULT` | No | `false` | Add `dir_action=navigate` by default to route links |
-| `GOOGLE_MAPS_API_KEY` | No | — | Google Maps API key used by Places and Routes API tools |
-| `GOOGLE_MAPS_PLATFORM` | No | — | Optional Google Maps Platform project identifier for future metadata or routing policy use |
-| `MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN` | No | `nlm` | NotebookLM CLI binary used by the wrapper tools |
-| `MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED` | No | `true` | Allow NotebookLM tools at runtime |
-| `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE` | No | `mythosaur` | NotebookLM auth profile to use inside the container |
-| `MYTHOSAUR_TOOLS_NOTEBOOKLM_TIMEOUT` | No | `120` | Default NotebookLM query timeout in seconds |
-| `NOTEBOOKLM_MCP_CLI_PATH` | No | `/secrets/notebooklm` | Shared NotebookLM CLI state directory mounted into the container |
-| `MYTHOSAUR_TOOLS_RATE_LIMIT` | No | `120` | Max tool calls per 60s window (0 = disabled) |
-| `LOG_LEVEL` | No | `INFO` | Python log level |
+| `MT_API_KEY` | Yes | — | Bearer token for MCP auth |
+| `MT_DEFAULT_CONSUMER` | No | — | Optional default consumer profile such as `codex` or `cursor` when a client does not send a consumer hint |
+| `MT_MCP_PORT` | No | `8064` | HTTP listen port |
+| `MT_PROFILE` | No | `readonly` | `readonly` or `power` (controls mutating FS tools) |
+| `MT_WORKSPACE_ROOT` | No | `/workspace` | Root for filesystem/git tools |
+| `MT_PII_ROOT` | No | `MT_WORKSPACE_ROOT` | Base dir for PII repo scans and hook installs |
+| `MT_PII_SCRIPT_PATH` | No | `scripts/pii_scan.py` in repo root | Local CLI script used by installed pre-commit hooks |
+| `MT_SEARXNG_PORT` | No | `8063` | Host port for bundled `searxng-cache` |
+| `MT_SEARXNG_URL` | No | `http://searxng-cache:8080` | SearXNG endpoint for search tools |
+| `MT_SEARXNG_TOKEN` | No | — | Optional SearXNG auth token |
+| `MT_BROWSER_ENABLED` | No | `false` | Enable browser tools |
+| `MT_BROWSER_HEADLESS` | No | `true` | Run browser headless |
+| `MT_GOOGLE_CREDENTIALS_FILE` | No | `/secrets/google-credentials.json` | Google OAuth client credentials file |
+| `MT_GOOGLE_TOKEN_FILE` | No | `/secrets/google-token.json` | Google OAuth authorized user token file |
+| `MT_GOOGLE_CALENDAR_READ_ENABLED` | No | `true` | Allow calendar read tools |
+| `MT_GOOGLE_CALENDAR_WRITE_ENABLED` | No | `false` | Allow calendar event creation |
+| `MT_GOOGLE_GMAIL_READ_ENABLED` | No | `true` | Allow Gmail read tools |
+| `MT_GOOGLE_GMAIL_SEND_ENABLED` | No | `false` | Allow Gmail send tool |
+| `MT_GOOGLE_DRIVE_READ_ENABLED` | No | `true` | Allow Drive read tools |
+| `MT_GOOGLE_DRIVE_WRITE_ENABLED` | No | `false` | Allow Drive write tools |
+| `MT_GOOGLE_SHEETS_READ_ENABLED` | No | `true` | Allow Sheets read tools |
+| `MT_GOOGLE_SHEETS_WRITE_ENABLED` | No | `false` | Allow Sheets write tools |
+| `MT_GOOGLE_DOCS_READ_ENABLED` | No | `true` | Allow Google Docs read tools |
+| `MT_GOOGLE_DOCS_WRITE_ENABLED` | No | `false` | Allow Google Docs create/write tools |
+| `MT_GOOGLE_PHOTOS_READ_ENABLED` | No | `false` | Allow Google Photos app-created read tools |
+| `MT_GOOGLE_PHOTOS_WRITE_ENABLED` | No | `false` | Allow Google Photos app-created write tools |
+| `MT_GOOGLE_MAPS_ENABLED` | No | `true` | Allow Google Maps tools |
+| `MT_GOOGLE_MAPS_NAVIGATE_DEFAULT` | No | `false` | Add `dir_action=navigate` by default to route links |
+| `MT_GOOGLE_MAPS_API_KEY` | No | — | Google Maps API key used by Places and Routes API tools |
+| `MT_GOOGLE_MAPS_PLATFORM` | No | — | Optional Google Maps Platform project identifier for future metadata or routing policy use |
+| `MT_NOTEBOOKLM_BIN` | No | `nlm` | NotebookLM CLI binary used by the wrapper tools |
+| `MT_NOTEBOOKLM_ENABLED` | No | `true` | Allow NotebookLM tools at runtime |
+| `MT_NOTEBOOKLM_PROFILE` | No | `mythosaur` | NotebookLM auth profile to use inside the container |
+| `MT_NOTEBOOKLM_TIMEOUT` | No | `120` | Default NotebookLM query timeout in seconds |
+| `MT_NOTEBOOKLM_MCP_CLI_PATH` | No | `/secrets/notebooklm` | Shared NotebookLM CLI state directory mounted into the container |
+| `MT_RATE_LIMIT` | No | `120` | Max tool calls per 60s window (0 = disabled) |
+| `MT_LOG_LEVEL` | No | `INFO` | Python log level |
 
 ---
 
@@ -380,7 +383,7 @@ The MCP container mounts `./secrets` to `/secrets`, and the Google tools read cr
 
 If the token is missing, expired, or not authorized for the requested scopes, the tool returns a structured MCP error.
 
-For standalone use with Cursor or another MCP client, set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` directly in `.env`. When launched by `mythosaur-ai`, that repo overrides the value with its `WORKSPACE_DIR`.
+For standalone use with Cursor or another MCP client, set `MT_WORKSPACE_HOST` directly in `.env`. When launched by `mythosaur-ai`, that repo overrides the value with its `WORKSPACE_DIR`.
 From `mythosaur-ai`, `make google-login` just delegates to this repo.
 
 Write-capable tools such as `google_calendar_create_event`, `gmail_send`, `google_drive_upload_file`, and the Sheets write helpers need broader Google scopes than the read-only tools. If those calls fail after deployment, refresh `./secrets/google-token.json` with the required scopes.
@@ -395,8 +398,8 @@ Current Google Photos limitation:
 
 Optional future Maps Platform setup for API-backed itinerary work:
 
-- set `GOOGLE_MAPS_API_KEY` in `.env` for Places and Routes API-backed tools
-- set `GOOGLE_MAPS_PLATFORM` in `.env`
+- set `MT_GOOGLE_MAPS_API_KEY` in `.env` for Places and Routes API-backed tools
+- set `MT_GOOGLE_MAPS_PLATFORM` in `.env`
 - enable only the Maps Platform services you actually plan to call
 - link-builder tools work without the key
 - `google_maps_search_places` and `google_maps_compute_route` require the key
@@ -452,9 +455,9 @@ are automatically offloaded to a thread pool via `asyncio.to_thread`.
 mythosaur-ai is one consumer of this stack. Its Makefile can auto-start the stack on `make up`:
 
 1. Checks for `../mythosaur-tools/docker-compose.yml`
-2. If `MYTHOSAUR_TOOLS_AUTOSTART=true` (default), starts this stack
-3. Injects its own `WORKSPACE_DIR` as `MYTHOSAUR_TOOLS_WORKSPACE_HOST` so tools operate on the same workspace
-4. mythosaur-ai sends `tools/call` requests to `MYTHOSAUR_TOOLS_MCP_URL`
+2. If `MT_AUTOSTART=true` (default), starts this stack
+3. Injects its own `WORKSPACE_DIR` as `MT_WORKSPACE_HOST` so tools operate on the same workspace
+4. mythosaur-ai sends `tools/call` requests to `MT_MCP_URL`
 
 After changing tools, run `make tools-refresh` from mythosaur-ai to rebuild this stack and refresh its tool catalog.
 
@@ -471,14 +474,14 @@ Cursor connects via `.cursor/mcp.json`:
     "mythosaur-tools": {
       "url": "http://127.0.0.1:8064/mcp",
       "headers": {
-        "Authorization": "Bearer <MYTHOSAUR_TOOLS_API_KEY>"
+        "Authorization": "Bearer <MT_API_KEY>"
       }
     }
   }
 }
 ```
 
-Set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` in `.env` to the project Cursor should operate on.
+Set `MT_WORKSPACE_HOST` in `.env` to the project Cursor should operate on.
 Restart the stack and Cursor after changes.
 
 ### Codex / Claude Code
@@ -487,8 +490,8 @@ Codex and Claude Code can connect to the same HTTP MCP endpoint:
 
 1. Start this stack with `docker compose up -d --build`
 2. Configure the client to use `http://127.0.0.1:8064/mcp`
-3. Send `Authorization: Bearer <MYTHOSAUR_TOOLS_API_KEY>`
-4. Set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` in `.env` to the target project path
+3. Send `Authorization: Bearer <MT_API_KEY>`
+4. Set `MT_WORKSPACE_HOST` in `.env` to the target project path
 5. Restart the stack after tool changes so the client reloads the catalog
 
 ### Any MCP Client
@@ -516,6 +519,9 @@ Export skills to a consumer:
 ./scripts/export-skills.sh /path/to/consumer/skills
 ./scripts/export-skills.sh --consumer codex /path/to/consumer/skills
 ```
+
+Current shared export includes routing/reference skills such as `tool-intent-router`,
+`context7`, `shadcn-ui`, `shadcn-mcp`, `ui-ux-pro-max`, `agent-browser`, and `google-workspace-router`.
 
 ---
 

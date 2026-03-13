@@ -13,9 +13,9 @@ It runs as a Docker stack and exposes tools over HTTP POST at `/mcp`.
 
 | Consumer | How it connects | Workspace override |
 |----------|----------------|-------------------|
-| **mythosaur-ai** | `MYTHOSAUR_TOOLS_MCP_URL` + `MYTHOSAUR_TOOLS_API_KEY` in its `.env`. `make up` can auto-start this stack and inject `WORKSPACE_DIR` so both stacks share the same workspace. | `MYTHOSAUR_TOOLS_WORKSPACE_HOST` overridden by mythosaur-ai's Makefile |
-| **Codex / Claude Code** | Configure this repo as an MCP HTTP server and point the client at `http://127.0.0.1:8064/mcp` with Bearer auth. | Set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` in `.env` to the target project |
-| **Cursor IDE** | `.cursor/mcp.json` with `url` + `Authorization` header pointing at `http://127.0.0.1:8064/mcp` | Set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` in `.env` to the project open in Cursor |
+| **mythosaur-ai** | `MT_MCP_URL` + `MT_API_KEY` in its `.env`. `make up` can auto-start this stack and inject `WORKSPACE_DIR` so both stacks share the same workspace. | `MT_WORKSPACE_HOST` overridden by mythosaur-ai's Makefile |
+| **Codex / Claude Code** | Configure this repo as an MCP HTTP server and point the client at `http://127.0.0.1:8064/mcp` with Bearer auth. | Set `MT_WORKSPACE_HOST` in `.env` to the target project |
+| **Cursor IDE** | `.cursor/mcp.json` with `url` + `Authorization` header pointing at `http://127.0.0.1:8064/mcp` | Set `MT_WORKSPACE_HOST` in `.env` to the project open in Cursor |
 | **Any MCP client** | HTTP POST to `/mcp` with Bearer auth. See `docs/integration.md` for the JSON-RPC protocol. | Same env var |
 
 ### Boundary Rules
@@ -73,11 +73,11 @@ It runs as a Docker stack and exposes tools over HTTP POST at `/mcp`.
 ## How mythosaur-ai Consumes This Repo
 
 1. **Auto-start**: `make up` in mythosaur-ai checks for `../mythosaur-tools/docker-compose.yml`.
-   If found and `MYTHOSAUR_TOOLS_AUTOSTART=true` (default), it starts this stack with
-   `MYTHOSAUR_TOOLS_WORKSPACE_HOST` set to mythosaur-ai's `WORKSPACE_DIR`.
+   If found and `MT_AUTOSTART=true` (default), it starts this stack with
+   `MT_WORKSPACE_HOST` set to mythosaur-ai's `WORKSPACE_DIR`.
 
 2. **Tool calls**: mythosaur-ai sends JSON-RPC `tools/call` requests to
-   `MYTHOSAUR_TOOLS_MCP_URL` (default: `http://mythosaur-tools:8080/mcp` or `http://127.0.0.1:8064/mcp`).
+   `MT_MCP_URL` (default: `http://mythosaur-tools:8080/mcp` or `http://127.0.0.1:8064/mcp`).
 
 3. **Catalog refresh**: `make tools-refresh` in mythosaur-ai rebuilds this stack and
    reloads the `tools/list` catalog in the consuming runtime.
@@ -92,17 +92,17 @@ It runs as a Docker stack and exposes tools over HTTP POST at `/mcp`.
 ## How Codex / Claude Code Consume This Repo
 
 1. Configure `mythosaur-tools` as an MCP server using the local HTTP endpoint.
-2. Point the client to `http://127.0.0.1:8064/mcp` with `Authorization: Bearer <MYTHOSAUR_TOOLS_API_KEY>`.
-3. Set `MYTHOSAUR_TOOLS_WORKSPACE_HOST` in this repo's `.env` to the project the tools should operate on.
+2. Point the client to `http://127.0.0.1:8064/mcp` with `Authorization: Bearer <MT_API_KEY>`.
+3. Set `MT_WORKSPACE_HOST` in this repo's `.env` to the project the tools should operate on.
 4. Export the shared skills plus the Codex adapter bundle with `./scripts/export-skills.sh --consumer codex`.
-5. If the client cannot send a consumer hint during `tools/list`, set `MYTHOSAUR_TOOLS_DEFAULT_CONSUMER=codex` for that instance.
+5. If the client cannot send a consumer hint during `tools/list`, set `MT_DEFAULT_CONSUMER=codex` for that instance.
 6. Restart the stack after tool or config changes so the client sees the updated catalog.
 
 ## How Cursor Consumes This Repo
 
 1. `.cursor/mcp.json` points at `http://127.0.0.1:8064/mcp` with a Bearer token.
 2. Cursor's Agent discovers tools via the MCP protocol and uses them in chat.
-3. `MYTHOSAUR_TOOLS_WORKSPACE_HOST` in `.env` determines what the tools can access.
+3. `MT_WORKSPACE_HOST` in `.env` determines what the tools can access.
    Set it to `.` for this repo or to the project you have open in Cursor.
 
 ## How Any Other Client Can Consume This Repo

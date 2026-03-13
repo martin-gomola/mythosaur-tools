@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from .common import ToolDef, bool_env, err, now_ms, ok, parse_int, resolve_under_workspace, validate_fetch_url
+from .common import ToolDef, bool_env, env_get, err, now_ms, ok, parse_int, resolve_under_workspace, validate_fetch_url
 from .content_extraction import extract_html_content
 
 
@@ -24,7 +24,7 @@ class BrowserManager:
         self.sessions: dict[str, BrowserSession] = {}
 
     def enabled(self) -> bool:
-        return bool_env("MYTHOSAUR_TOOLS_BROWSER_ENABLED", False)
+        return bool_env("MT_BROWSER_ENABLED", False)
 
     def _create(self, session_id: str | None = None) -> BrowserSession:
         try:
@@ -34,7 +34,7 @@ class BrowserManager:
 
         sid = (session_id or "").strip() or f"browser-{uuid.uuid4().hex[:12]}"
         pw = sync_playwright().start()
-        headless = (os.getenv("MYTHOSAUR_TOOLS_BROWSER_HEADLESS") or "true").strip().lower() != "false"
+        headless = (env_get("MT_BROWSER_HEADLESS", "true") or "true").strip().lower() != "false"
         browser = pw.chromium.launch(headless=headless)
         context = browser.new_context()
         page = context.new_page()
@@ -70,7 +70,7 @@ BROWSER = BrowserManager()
 
 
 def _not_enabled(tool: str, started: int) -> dict:
-    return err(tool, "disabled", "browser tools disabled (set MYTHOSAUR_TOOLS_BROWSER_ENABLED=true)", "browser", started)
+    return err(tool, "disabled", "browser tools disabled (set MT_BROWSER_ENABLED=true)", "browser", started)
 
 
 def _navigate(args: dict) -> dict:

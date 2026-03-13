@@ -27,18 +27,18 @@ That boundary is deliberate. Network and API integrations benefit from one share
 - MCP endpoint at `/mcp`
 - health endpoint at `/healthz`
 - bundled SearXNG plus `searxng-cache` for search
-- bearer auth with `Authorization: Bearer <MYTHOSAUR_TOOLS_API_KEY>`
+- bearer auth with `Authorization: Bearer <MT_API_KEY>`
 - canonical plugin namespace `mythosaur.*` with `osaurus.*` aliases
 
 ## Quick Start
 
 ```bash
 cp .env.example .env
-# set MYTHOSAUR_TOOLS_API_KEY
-# set MYTHOSAUR_TOOLS_WORKSPACE_HOST to the repo or workspace you want exposed
+# set MT_API_KEY
+# set MT_WORKSPACE_HOST to the repo or workspace you want exposed
 
 docker compose up -d --build
-curl -s http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}/healthz | jq
+curl -s http://127.0.0.1:${MT_MCP_PORT:-8064}/healthz | jq
 ```
 
 Default host ports:
@@ -63,6 +63,15 @@ The full catalog lives in [docs/catalog.md](docs/catalog.md).
 ## Skills
 
 Shared skill source-of-truth lives under `skills/shared/*`.
+
+Notable shared references include:
+
+- `context7` for current library/framework docs
+- `shadcn-ui` for official `ui.shadcn.com` skills and component guidance
+- `shadcn-mcp` for official shadcn MCP execution guidance
+- `ui-ux-pro-max` for broader UI/UX direction, hierarchy, and polish guidance
+- `tool-intent-router` for minimal MCP routing
+- `google-workspace-router` for Google and NotebookLM routing
 
 Consumer-specific adapter skills live under `skills/consumers/*`.
 These adapt shared workflows to a specific runtime without moving product-specific
@@ -92,7 +101,7 @@ Each export writes `.export-manifest.json` in the destination so you can inspect
 skills were copied and which sibling skills were overwritten in the parent registry.
 
 For IDE-focused deployments, you can also run the server with
-`MYTHOSAUR_TOOLS_DEFAULT_CONSUMER=codex` to default discovery to the lighter remote-execution catalog.
+`MT_DEFAULT_CONSUMER=codex` to default discovery to the lighter remote-execution catalog.
 
 Useful shortcuts:
 
@@ -143,5 +152,5 @@ Start here, then go deeper only if you need the details:
 
 ## The Pact with mythosaur-ai
 
-`mythosaur-ai` consumes this MCP backend via `MYTHOSAUR_TOOLS_MCP_URL` and `MYTHOSAUR_TOOLS_API_KEY`.
+`mythosaur-ai` consumes this MCP backend via `MT_MCP_URL` and `MT_API_KEY`.
 The same backend can serve Grogu, Mythosaur, Nanoclaw, and local IDE clients without duplicating tool logic or auth bootstrap.

@@ -93,7 +93,7 @@ def _maps_build_route_link(args: dict[str, Any]) -> dict[str, Any]:
     }
     if waypoints:
         params["waypoints"] = "|".join(waypoints)
-    if bool_env("MYTHOSAUR_TOOLS_GOOGLE_MAPS_NAVIGATE_DEFAULT", False) or bool(args.get("navigate")):
+    if bool_env("MT_GOOGLE_MAPS_NAVIGATE_DEFAULT", False) or bool(args.get("navigate")):
         params["dir_action"] = "navigate"
     url = "https://www.google.com/maps/dir/?" + urlencode(params)
 

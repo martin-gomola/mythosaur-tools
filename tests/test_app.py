@@ -10,8 +10,8 @@ from services.mcp_server.plugins.time_tools import get_tools as get_time_tools
 
 @pytest.fixture(autouse=True)
 def _set_api_key(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_API_KEY", "test-key-123")
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "0")
+    monkeypatch.setenv("MT_API_KEY", "test-key-123")
+    monkeypatch.setenv("MT_RATE_LIMIT", "0")
 
 
 @pytest.fixture
@@ -28,12 +28,12 @@ def _auth():
 
 
 def _reload_client(monkeypatch, *, default_consumer: str | None = None) -> TestClient:
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_API_KEY", "test-key-123")
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "0")
+    monkeypatch.setenv("MT_API_KEY", "test-key-123")
+    monkeypatch.setenv("MT_RATE_LIMIT", "0")
     if default_consumer is None:
-        monkeypatch.delenv("MYTHOSAUR_TOOLS_DEFAULT_CONSUMER", raising=False)
+        monkeypatch.delenv("MT_DEFAULT_CONSUMER", raising=False)
     else:
-        monkeypatch.setenv("MYTHOSAUR_TOOLS_DEFAULT_CONSUMER", default_consumer)
+        monkeypatch.setenv("MT_DEFAULT_CONSUMER", default_consumer)
 
     from importlib import reload
     import services.mcp_server.app as app_module
@@ -113,6 +113,34 @@ class TestHealthz:
         body = resp.json()
         assert body["default_consumer"] == "default"
         assert "codex" in body["supported_consumers"]
+
+    def test_legacy_env_aliases_still_work(self, monkeypatch):
+        monkeypatch.delenv("MT_API_KEY", raising=False)
+        monkeypatch.delenv("MT_RATE_LIMIT", raising=False)
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_API_KEY", "legacy-key")
+        monkeypatch.setenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "0")
+
+        from importlib import reload
+        import services.mcp_server.app as app_module
+
+        reload(app_module)
+        client = TestClient(app_module.app)
+        resp = client.post(
+            "/mcp",
+            headers={"Authorization": "Bearer legacy-key", "Content-Type": "application/json"},
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "1.0.0"},
+                },
+            },
+        )
+
+        assert resp.status_code == 200
 
 
 class TestSchema:
@@ -344,10 +372,10 @@ class TestMcpToolsCall:
         assert "mcp.usage total_calls=1 unique_tools=1 top_tools=current_time:1" in caplog.text
 
     def test_usage_summary_logs_after_configured_call_interval(self, monkeypatch, caplog):
-        monkeypatch.setenv("MYTHOSAUR_TOOLS_API_KEY", "test-key-123")
-        monkeypatch.setenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "0")
-        monkeypatch.setenv("MYTHOSAUR_TOOLS_USAGE_LOG_EVERY", "2")
-        monkeypatch.setenv("MYTHOSAUR_TOOLS_USAGE_LOG_INTERVAL_SEC", "3600")
+        monkeypatch.setenv("MT_API_KEY", "test-key-123")
+        monkeypatch.setenv("MT_RATE_LIMIT", "0")
+        monkeypatch.setenv("MT_USAGE_LOG_EVERY", "2")
+        monkeypatch.setenv("MT_USAGE_LOG_INTERVAL_SEC", "3600")
 
         from importlib import reload
         import services.mcp_server.app as app_module
@@ -377,8 +405,8 @@ class TestMcpToolsCall:
 
 class TestRateLimiting:
     def test_rate_limit_enforced(self, monkeypatch):
-        monkeypatch.setenv("MYTHOSAUR_TOOLS_API_KEY", "test-key-123")
-        monkeypatch.setenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "3")
+        monkeypatch.setenv("MT_API_KEY", "test-key-123")
+        monkeypatch.setenv("MT_RATE_LIMIT", "3")
 
         from importlib import reload
         import services.mcp_server.app as app_module
@@ -446,7 +474,7 @@ def test_search_missing_query():
 
 
 def test_search_no_searxng_url(monkeypatch):
-    monkeypatch.delenv("MYTHOSAUR_TOOLS_SEARXNG_URL", raising=False)
+    monkeypatch.delenv("MT_SEARXNG_URL", raising=False)
     payload = _run(_search_tool("search").handler({"query": "test"}))
     assert payload["status"] == "error"
     assert "not configured" in payload["error"]["message"]

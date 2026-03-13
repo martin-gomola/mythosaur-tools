@@ -316,7 +316,7 @@ def test_google_calendar_events(monkeypatch):
 
 
 def test_google_calendar_create_event(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_CALENDAR_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _CalendarService())
     result = cal._calendar_create_event(
         {
@@ -354,7 +354,7 @@ def test_gmail_unread_only(monkeypatch):
 
 
 def test_gmail_send(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_GMAIL_SEND_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _GmailService())
     result = gmail._gmail_send(
         {"to": ["person@example.com"], "subject": "Hello", "body_text": "Plain text body"}
@@ -372,7 +372,7 @@ def test_google_drive_recent_files(monkeypatch):
 
 
 def test_google_drive_create_folder(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_DRIVE_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _DriveService())
     result = drive._drive_create_folder({"folder_name": "Routes"})
     assert result["status"] == "ok"
@@ -381,9 +381,9 @@ def test_google_drive_create_folder(monkeypatch):
 
 
 def test_google_drive_upload_file(monkeypatch, tmp_path):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_DRIVE_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _DriveService())
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setenv("MT_WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.setitem(sys.modules, "googleapiclient", types.SimpleNamespace(http=types.SimpleNamespace()))
     monkeypatch.setitem(sys.modules, "googleapiclient.http", types.SimpleNamespace(MediaFileUpload=_MediaFileUpload))
     sample = tmp_path / "sample.txt"
@@ -397,7 +397,7 @@ def test_google_drive_upload_file(monkeypatch, tmp_path):
 
 
 def test_google_drive_create_text_file(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_DRIVE_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _DriveService())
     monkeypatch.setitem(sys.modules, "googleapiclient", types.SimpleNamespace(http=types.SimpleNamespace()))
     monkeypatch.setitem(
@@ -422,7 +422,7 @@ def test_google_sheets_read_range(monkeypatch):
 
 
 def test_google_sheets_write_range(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_SHEETS_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _SheetsService())
     result = sheets._sheets_write_range(
         {"spreadsheet_id": "sheet1", "range": "Sheet1!A1:B1", "values": [["A", "B"]]}
@@ -432,7 +432,7 @@ def test_google_sheets_write_range(monkeypatch):
 
 
 def test_google_sheets_append_rows(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_SHEETS_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _SheetsService())
     result = sheets._sheets_append_rows(
         {"spreadsheet_id": "sheet1", "range": "Sheet1!A:B", "rows": [["A", "B"]]}
@@ -442,7 +442,7 @@ def test_google_sheets_append_rows(monkeypatch):
 
 
 def test_google_sheets_create_sheet(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_SHEETS_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _SheetsService())
     result = sheets._sheets_create_sheet({"spreadsheet_id": "sheet1", "sheet_title": "Routes"})
     assert result["status"] == "ok"
@@ -460,7 +460,7 @@ def test_google_docs_get(monkeypatch):
 
 
 def test_google_docs_create(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_DOCS_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _DocsService())
     result = docs._docs_create({"title": "Daily Briefing", "content": "Status update"})
     assert result["status"] == "ok"
@@ -486,7 +486,7 @@ def test_google_maps_build_place_link():
 
 
 def test_google_maps_search_places(monkeypatch):
-    monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "maps-key")
+    monkeypatch.setenv("MT_GOOGLE_MAPS_API_KEY", "maps-key")
 
     def _fake_post(url, json, headers, timeout):
         assert url == "https://places.googleapis.com/v1/places:searchText"
@@ -516,7 +516,7 @@ def test_google_maps_search_places(monkeypatch):
 
 
 def test_google_maps_compute_route(monkeypatch):
-    monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "maps-key")
+    monkeypatch.setenv("MT_GOOGLE_MAPS_API_KEY", "maps-key")
 
     def _fake_post(url, json, headers, timeout):
         assert url == "https://routes.googleapis.com/directions/v2:computeRoutes"
@@ -557,6 +557,8 @@ def test_google_maps_compute_route(monkeypatch):
 
 
 def test_google_maps_api_tools_require_key(monkeypatch):
+    monkeypatch.delenv("MT_GOOGLE_MAPS_API_KEY", raising=False)
+    monkeypatch.delenv("MT_GOOGLE_MAPS_PLATFORM", raising=False)
     monkeypatch.delenv("GOOGLE_MAPS_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_MAPS_PLATFORM", raising=False)
 
@@ -567,8 +569,8 @@ def test_google_maps_api_tools_require_key(monkeypatch):
 
 
 def test_google_auth_status_includes_maps_service_check(monkeypatch, tmp_path):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE", str(tmp_path / "missing-token.json"))
-    monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "maps-key")
+    monkeypatch.setenv("MT_GOOGLE_TOKEN_FILE", str(tmp_path / "missing-token.json"))
+    monkeypatch.setenv("MT_GOOGLE_MAPS_API_KEY", "maps-key")
 
     result = auth.google_auth_status()
 
@@ -579,7 +581,7 @@ def test_google_auth_status_includes_maps_service_check(monkeypatch, tmp_path):
 
 
 def test_google_photos_create_album(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_PHOTOS_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_get_credentials", lambda scopes: _FakeCreds())
 
     def _fake_request(method, url, headers=None, json=None, params=None, data=None, timeout=None):
@@ -597,7 +599,7 @@ def test_google_photos_create_album(monkeypatch):
 
 
 def test_google_photos_list_media_items(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_READ_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_PHOTOS_READ_ENABLED", "true")
     monkeypatch.setattr(auth, "_get_credentials", lambda scopes: _FakeCreds())
 
     def _fake_request(method, url, headers=None, json=None, params=None, data=None, timeout=None):
@@ -628,7 +630,7 @@ def test_google_photos_list_media_items(monkeypatch):
 
 
 def test_google_photos_find_duplicate_candidates(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_READ_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_PHOTOS_READ_ENABLED", "true")
     monkeypatch.setattr(auth, "_get_credentials", lambda scopes: _FakeCreds())
 
     def _fake_request(method, url, headers=None, json=None, params=None, data=None, timeout=None):
@@ -668,8 +670,8 @@ def test_google_photos_find_duplicate_candidates(monkeypatch):
 
 
 def test_google_photos_upload_file(monkeypatch, tmp_path):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED", "true")
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setenv("MT_GOOGLE_PHOTOS_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_WORKSPACE_ROOT", str(tmp_path))
     monkeypatch.setattr(auth, "_get_credentials", lambda scopes: _FakeCreds())
 
     sample = tmp_path / "photo.jpg"
@@ -712,7 +714,7 @@ def test_google_photos_upload_file(monkeypatch, tmp_path):
 
 
 def test_google_photos_create_curated_album(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED", "true")
+    monkeypatch.setenv("MT_GOOGLE_PHOTOS_WRITE_ENABLED", "true")
     monkeypatch.setattr(auth, "_get_credentials", lambda scopes: _FakeCreds())
     calls = []
 
@@ -733,7 +735,7 @@ def test_google_photos_create_curated_album(monkeypatch):
 
 
 def test_google_capability_guard(monkeypatch):
-    monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", "false")
+    monkeypatch.setenv("MT_GOOGLE_GMAIL_SEND_ENABLED", "false")
     result = gmail._gmail_send(
         {"to": ["person@example.com"], "subject": "Hello", "body_text": "Plain text body"}
     )
@@ -745,13 +747,13 @@ def test_google_capability_guard(monkeypatch):
     ("setup", "call", "error_code"),
     [
         (
-            lambda monkeypatch: monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", "true"),
+            lambda monkeypatch: monkeypatch.setenv("MT_GOOGLE_GMAIL_SEND_ENABLED", "true"),
             lambda: gmail._gmail_send({"to": ["not-an-email"], "subject": "Hello", "body_text": "test"}),
             "invalid_email",
         ),
         (
             lambda monkeypatch: (
-                monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", "true"),
+                monkeypatch.setenv("MT_GOOGLE_GMAIL_SEND_ENABLED", "true"),
                 monkeypatch.setattr(auth, "_build_service", lambda *args, **kwargs: _GmailService()),
             ),
             lambda: gmail._gmail_send(
@@ -769,7 +771,7 @@ def test_google_capability_guard(monkeypatch):
             "invalid_timestamp",
         ),
         (
-            lambda monkeypatch: monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED", "true"),
+            lambda monkeypatch: monkeypatch.setenv("MT_GOOGLE_CALENDAR_WRITE_ENABLED", "true"),
             lambda: cal._calendar_create_event(
                 {
                     "summary": "Test",
@@ -791,12 +793,12 @@ def test_google_capability_guard(monkeypatch):
             "query_too_long",
         ),
         (
-            lambda monkeypatch: monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", "true"),
+            lambda monkeypatch: monkeypatch.setenv("MT_GOOGLE_DRIVE_WRITE_ENABLED", "true"),
             lambda: drive._drive_create_text_file({"file_name": "big.txt", "content": "x" * (10 * 1024 * 1024 + 1)}),
             "content_too_large",
         ),
         (
-            lambda monkeypatch: monkeypatch.setenv("MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED", "true"),
+            lambda monkeypatch: monkeypatch.setenv("MT_GOOGLE_DOCS_WRITE_ENABLED", "true"),
             lambda: docs._docs_create({"title": "Big Doc", "content": "x" * (10 * 1024 * 1024 + 1)}),
             "content_too_large",
         ),

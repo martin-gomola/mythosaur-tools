@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import os
 import re
 import subprocess
 from pathlib import Path
 from typing import Any, Final
 
-from .common import JsonDict, ToolDef, err, now_ms, ok, parse_int, resolve_under_base, workspace_root
+from .common import JsonDict, ToolDef, env_get, err, now_ms, ok, parse_int, resolve_under_base, workspace_root
 
 PLUGIN_ID: Final = "mythosaur.pii"
 PLUGIN_SOURCE: Final = "pii"
@@ -24,7 +23,7 @@ PATTERNS: list[tuple[str, str, str, re.Pattern[str]]] = [
 
 
 def pii_root() -> Path:
-    raw = (os.getenv("MYTHOSAUR_TOOLS_PII_ROOT") or str(workspace_root())).strip() or str(workspace_root())
+    raw = (env_get("MT_PII_ROOT", str(workspace_root())) or str(workspace_root())).strip() or str(workspace_root())
     return Path(raw).expanduser().resolve()
 
 
@@ -33,7 +32,7 @@ def tools_repo_root() -> Path:
 
 
 def pii_script_path() -> Path:
-    raw = (os.getenv("MYTHOSAUR_TOOLS_PII_SCRIPT_PATH") or "").strip()
+    raw = (env_get("MT_PII_SCRIPT_PATH", "") or "").strip()
     if raw:
         return Path(raw).expanduser().resolve()
     return (tools_repo_root() / "scripts" / "pii_scan.py").resolve()

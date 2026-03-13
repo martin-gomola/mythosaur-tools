@@ -8,29 +8,29 @@ services:
     env_file:
       - .env
     environment:
-      MYTHOSAUR_TOOLS_API_KEY: ${MYTHOSAUR_TOOLS_API_KEY}
-      MYTHOSAUR_TOOLS_PROFILE: ${MYTHOSAUR_TOOLS_PROFILE:-readonly}
-      MYTHOSAUR_TOOLS_WORKSPACE_ROOT: ${MYTHOSAUR_TOOLS_WORKSPACE_ROOT:-/workspace}
-      MYTHOSAUR_TOOLS_SEARXNG_URL: ${MYTHOSAUR_TOOLS_SEARXNG_URL:-http://searxng-cache:8080}
-      MYTHOSAUR_TOOLS_SEARXNG_TOKEN: ${MYTHOSAUR_TOOLS_SEARXNG_TOKEN:-}
-      MYTHOSAUR_TOOLS_BROWSER_ENABLED: ${MYTHOSAUR_TOOLS_BROWSER_ENABLED:-false}
-      MYTHOSAUR_TOOLS_BROWSER_HEADLESS: ${MYTHOSAUR_TOOLS_BROWSER_HEADLESS:-true}
-      MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE: ${MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE:-/secrets/google-credentials.json}
-      MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE: ${MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE:-/secrets/google-token.json}
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
-      GOOGLE_MAPS_PLATFORM: ${GOOGLE_MAPS_PLATFORM:-}
-      MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN: ${MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN:-nlm}
-      MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE: ${MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE:-default}
-      MYTHOSAUR_TOOLS_NOTEBOOKLM_TIMEOUT: ${MYTHOSAUR_TOOLS_NOTEBOOKLM_TIMEOUT:-120}
-      NOTEBOOKLM_MCP_CLI_PATH: ${NOTEBOOKLM_MCP_CLI_PATH:-/secrets/notebooklm}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      MT_API_KEY: ${MT_API_KEY}
+      MT_PROFILE: ${MT_PROFILE:-readonly}
+      MT_WORKSPACE_ROOT: ${MT_WORKSPACE_ROOT:-/workspace}
+      MT_SEARXNG_URL: ${MT_SEARXNG_URL:-http://searxng-cache:8080}
+      MT_SEARXNG_TOKEN: ${MT_SEARXNG_TOKEN:-}
+      MT_BROWSER_ENABLED: ${MT_BROWSER_ENABLED:-false}
+      MT_BROWSER_HEADLESS: ${MT_BROWSER_HEADLESS:-true}
+      MT_GOOGLE_CREDENTIALS_FILE: ${MT_GOOGLE_CREDENTIALS_FILE:-/secrets/google-credentials.json}
+      MT_GOOGLE_TOKEN_FILE: ${MT_GOOGLE_TOKEN_FILE:-/secrets/google-token.json}
+      MT_GOOGLE_MAPS_API_KEY: ${MT_GOOGLE_MAPS_API_KEY:-}
+      MT_GOOGLE_MAPS_PLATFORM: ${MT_GOOGLE_MAPS_PLATFORM:-}
+      MT_NOTEBOOKLM_BIN: ${MT_NOTEBOOKLM_BIN:-nlm}
+      MT_NOTEBOOKLM_PROFILE: ${MT_NOTEBOOKLM_PROFILE:-default}
+      MT_NOTEBOOKLM_TIMEOUT: ${MT_NOTEBOOKLM_TIMEOUT:-120}
+      MT_NOTEBOOKLM_MCP_CLI_PATH: ${MT_NOTEBOOKLM_MCP_CLI_PATH:-/secrets/notebooklm}
+      MT_LOG_LEVEL: ${MT_LOG_LEVEL:-INFO}
     depends_on:
       searxng-cache:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}:8080"
+      - "127.0.0.1:${MT_MCP_PORT:-8064}:8080"
     volumes:
-      - ${MYTHOSAUR_TOOLS_WORKSPACE_HOST:-../mythosaur-ai}:${MYTHOSAUR_TOOLS_WORKSPACE_ROOT:-/workspace}
+      - ${MT_WORKSPACE_HOST:-../mythosaur-ai}:${MT_WORKSPACE_ROOT:-/workspace}
       - ./secrets:/secrets
     restart: unless-stopped
 
@@ -59,7 +59,7 @@ services:
       searxng:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${MYTHOSAUR_TOOLS_SEARXNG_PORT:-8063}:8080"
+      - "127.0.0.1:${MT_SEARXNG_PORT:-8063}:8080"
     volumes:
       - ./searxng/cache-nginx.conf:/etc/nginx/nginx.conf:ro
       - mythosaur_tools_searxng_cache:/var/cache/nginx

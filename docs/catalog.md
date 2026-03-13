@@ -22,6 +22,9 @@ Bot-agnostic skill sources live here:
 
 - `skills/shared/context7`
 - `skills/shared/agent-browser`
+- `skills/shared/shadcn-ui`
+- `skills/shared/shadcn-mcp`
+- `skills/shared/ui-ux-pro-max`
 - `skills/shared/tool-intent-router`
 - `skills/shared/pii-precommit-check`
 - `skills/shared/google-workspace-router`
@@ -33,7 +36,7 @@ Consumer-specific adapter skills live here:
 Skill export path used by local agent environments:
 
 ```bash
-${MYTHOSAUR_TOOLS_SKILLS_DIR:-../mythosaur-tools/skills/shared}
+${MT_SKILLS_DIR:-../mythosaur-tools/skills/shared}
 ```
 
 Export the shared skills for Codex, Cursor, or another local agent runtime:
@@ -46,12 +49,12 @@ Export the shared skills for Codex, Cursor, or another local agent runtime:
 
 ## Security Defaults
 
-- Workspace paths must resolve under `MYTHOSAUR_TOOLS_WORKSPACE_ROOT`
-- PII scan paths must resolve under `MYTHOSAUR_TOOLS_PII_ROOT`
+- Workspace paths must resolve under `MT_WORKSPACE_ROOT`
+- PII scan paths must resolve under `MT_PII_ROOT`
 - Base-dir helpers reject NUL bytes and directory escape attempts
-- `MYTHOSAUR_TOOLS_WORKSPACE_HOST` controls the host path mounted into the container
+- `MT_WORKSPACE_HOST` controls the host path mounted into the container
 - `mythosaur-ai` overrides that host path with its own `WORKSPACE_DIR` when it launches this stack
 - `readonly` blocks mutating filesystem tools
 - `power` enables mutating filesystem tools
-- Browser tools are disabled by default with `MYTHOSAUR_TOOLS_BROWSER_ENABLED=false`
+- Browser tools are disabled by default with `MT_BROWSER_ENABLED=false`
 - Google Workspace tools require OAuth credentials and tokens mounted from `./secrets`

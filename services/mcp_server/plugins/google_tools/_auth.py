@@ -7,7 +7,6 @@ used across calendar, gmail, drive, sheets, docs, photos, and maps domains.
 from __future__ import annotations
 
 import json
-import os
 import re
 import threading
 from pathlib import Path
@@ -15,7 +14,7 @@ from typing import Any, Final
 
 import requests
 
-from ..common import JsonDict, bool_env, err
+from ..common import JsonDict, bool_env, env_get, err
 
 # --- Validation constants ---
 _MAX_CONTENT_BYTES = 10 * 1024 * 1024
@@ -148,12 +147,12 @@ def _google_modules():
 
 
 def _token_file() -> Path:
-    raw = (os.getenv("MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE") or DEFAULT_TOKEN_FILE).strip()
+    raw = (env_get("MT_GOOGLE_TOKEN_FILE", DEFAULT_TOKEN_FILE) or DEFAULT_TOKEN_FILE).strip()
     return Path(raw)
 
 
 def _credentials_file() -> Path:
-    raw = (os.getenv("MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE") or DEFAULT_CREDENTIALS_FILE).strip()
+    raw = (env_get("MT_GOOGLE_CREDENTIALS_FILE", DEFAULT_CREDENTIALS_FILE) or DEFAULT_CREDENTIALS_FILE).strip()
     return Path(raw)
 
 
@@ -185,12 +184,12 @@ def _build_service(name: str, version: str, scopes: list[str]):
 
 # --- Maps API key ---
 def _maps_api_key_value() -> str:
-    direct = (os.getenv("GOOGLE_MAPS_API_KEY") or "").strip()
+    direct = (env_get("MT_GOOGLE_MAPS_API_KEY", "") or "").strip()
     if direct:
         return direct
 
     # Backward-compatibility: older local envs incorrectly stored the API key here.
-    legacy = (os.getenv("GOOGLE_MAPS_PLATFORM") or "").strip()
+    legacy = (env_get("MT_GOOGLE_MAPS_PLATFORM", "") or "").strip()
     if legacy.startswith("AIza"):
         return legacy
     return ""
@@ -202,8 +201,8 @@ def _google_service_checks() -> dict[str, dict[str, Any]]:
         "maps": {
             "auth_type": "api_key",
             "configured": bool(maps_api_key),
-            "required_config": ["GOOGLE_MAPS_API_KEY"],
-            "missing_config": [] if maps_api_key else ["GOOGLE_MAPS_API_KEY"],
+            "required_config": ["MT_GOOGLE_MAPS_API_KEY"],
+            "missing_config": [] if maps_api_key else ["MT_GOOGLE_MAPS_API_KEY"],
         }
     }
 
@@ -214,7 +213,7 @@ def _maps_api_guard(tool_name: str, started: int) -> dict[str, Any] | None:
     return err(
         tool_name,
         "maps_api_key_missing",
-        "Google Maps API key is not configured. Set GOOGLE_MAPS_API_KEY.",
+        "Google Maps API key is not configured. Set MT_GOOGLE_MAPS_API_KEY.",
         GOOGLE_SOURCE,
         started,
     )
@@ -223,20 +222,20 @@ def _maps_api_guard(tool_name: str, started: int) -> dict[str, Any] | None:
 # --- Capabilities ---
 def google_capabilities() -> dict[str, bool]:
     return {
-        "calendar_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_READ_ENABLED", True),
-        "calendar_write": bool_env("MYTHOSAUR_TOOLS_GOOGLE_CALENDAR_WRITE_ENABLED", False),
-        "gmail_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_READ_ENABLED", True),
-        "gmail_send": bool_env("MYTHOSAUR_TOOLS_GOOGLE_GMAIL_SEND_ENABLED", False),
-        "drive_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_READ_ENABLED", True),
-        "drive_write": bool_env("MYTHOSAUR_TOOLS_GOOGLE_DRIVE_WRITE_ENABLED", False),
-        "sheets_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_READ_ENABLED", True),
-        "sheets_write": bool_env("MYTHOSAUR_TOOLS_GOOGLE_SHEETS_WRITE_ENABLED", False),
-        "docs_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_DOCS_READ_ENABLED", True),
-        "docs_write": bool_env("MYTHOSAUR_TOOLS_GOOGLE_DOCS_WRITE_ENABLED", False),
-        "photos_read": bool_env("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_READ_ENABLED", False),
-        "photos_write": bool_env("MYTHOSAUR_TOOLS_GOOGLE_PHOTOS_WRITE_ENABLED", False),
-        "notebooklm": bool_env("MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED", True),
-        "maps": bool_env("MYTHOSAUR_TOOLS_GOOGLE_MAPS_ENABLED", True),
+        "calendar_read": bool_env("MT_GOOGLE_CALENDAR_READ_ENABLED", True),
+        "calendar_write": bool_env("MT_GOOGLE_CALENDAR_WRITE_ENABLED", False),
+        "gmail_read": bool_env("MT_GOOGLE_GMAIL_READ_ENABLED", True),
+        "gmail_send": bool_env("MT_GOOGLE_GMAIL_SEND_ENABLED", False),
+        "drive_read": bool_env("MT_GOOGLE_DRIVE_READ_ENABLED", True),
+        "drive_write": bool_env("MT_GOOGLE_DRIVE_WRITE_ENABLED", False),
+        "sheets_read": bool_env("MT_GOOGLE_SHEETS_READ_ENABLED", True),
+        "sheets_write": bool_env("MT_GOOGLE_SHEETS_WRITE_ENABLED", False),
+        "docs_read": bool_env("MT_GOOGLE_DOCS_READ_ENABLED", True),
+        "docs_write": bool_env("MT_GOOGLE_DOCS_WRITE_ENABLED", False),
+        "photos_read": bool_env("MT_GOOGLE_PHOTOS_READ_ENABLED", False),
+        "photos_write": bool_env("MT_GOOGLE_PHOTOS_WRITE_ENABLED", False),
+        "notebooklm": bool_env("MT_NOTEBOOKLM_ENABLED", True),
+        "maps": bool_env("MT_GOOGLE_MAPS_ENABLED", True),
     }
 
 

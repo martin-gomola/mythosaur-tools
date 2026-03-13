@@ -10,6 +10,14 @@ from typing import Any, Final
 import requests
 
 
+def _env(name: str, *legacy_names: str, default: str = "") -> str:
+    for env_name in (name, *legacy_names):
+        value = (os.getenv(env_name) or "").strip()
+        if value:
+            return value
+    return default
+
+
 DEFAULT_BASE_URL: Final = "http://127.0.0.1:8064"
 DEFAULT_ORIGIN: Final = "Bratislava, Slovakia"
 DEFAULT_DESTINATION: Final = "Oscadnica, Slovakia"
@@ -40,13 +48,13 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--base-url",
-        default=(os.getenv("MYTHOSAUR_TOOLS_BASE_URL") or DEFAULT_BASE_URL).strip() or DEFAULT_BASE_URL,
+        default=_env("MT_BASE_URL", "MYTHOSAUR_TOOLS_BASE_URL", default=DEFAULT_BASE_URL) or DEFAULT_BASE_URL,
         help="Base URL for the mythosaur-tools HTTP service.",
     )
     parser.add_argument(
         "--api-key",
-        default=(os.getenv("MYTHOSAUR_TOOLS_API_KEY") or "").strip(),
-        help="Bearer token for mythosaur-tools. Defaults to MYTHOSAUR_TOOLS_API_KEY.",
+        default=_env("MT_API_KEY", "MYTHOSAUR_TOOLS_API_KEY"),
+        help="Bearer token for mythosaur-tools. Defaults to MT_API_KEY.",
     )
     parser.add_argument(
         "--spreadsheet-id",
@@ -94,7 +102,7 @@ def _headers(api_key: str, *, session_id: str | None = None) -> dict[str, str]:
 def _require_api_key(api_key: str) -> str:
     if api_key:
         return api_key
-    raise SystemExit("Missing API key. Set MYTHOSAUR_TOOLS_API_KEY or pass --api-key.")
+    raise SystemExit("Missing API key. Set MT_API_KEY or pass --api-key.")
 
 
 def _healthz(base_url: str) -> dict[str, Any]:

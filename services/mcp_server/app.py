@@ -12,10 +12,10 @@ from typing import Any, Final
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 
 from plugins import load_tools
-from plugins.common import ToolDef, bool_env
+from plugins.common import ToolDef, bool_env, env_get
 from plugins.google_tools import google_auth_status, google_capabilities
 
-logging.basicConfig(level=getattr(logging, (os.getenv("LOG_LEVEL") or "INFO").upper(), logging.INFO))
+logging.basicConfig(level=getattr(logging, (env_get("MT_LOG_LEVEL", "INFO") or "INFO").upper(), logging.INFO))
 logger = logging.getLogger(__name__)
 
 API_VERSION: Final = "0.2.0"
@@ -30,7 +30,7 @@ FETCH_PLUGIN_ID: Final = "mythosaur.fetch"
 TRANSCRIPT_PLUGIN_ID: Final = "mythosaur.transcript"
 TIME_PLUGIN_ID: Final = "mythosaur.time"
 PII_PLUGIN_ID: Final = "mythosaur.pii"
-DEFAULT_CONSUMER_ENV: Final = "MYTHOSAUR_TOOLS_DEFAULT_CONSUMER"
+DEFAULT_CONSUMER_ENV: Final = "MT_DEFAULT_CONSUMER"
 CONSUMER_HEADER: Final = "X-Mythosaur-Consumer"
 IDE_REMOTE_PLUGIN_IDS: Final = frozenset(
     {
@@ -58,12 +58,12 @@ TOOLS, PLUGINS_META = load_tools()
 SESSIONS: dict[str, dict[str, float]] = {}
 _SESSION_TTL_SEC = 3600
 _RATE_WINDOW_SEC = 60
-_RATE_MAX_CALLS = int(os.getenv("MYTHOSAUR_TOOLS_RATE_LIMIT", "120"))
+_RATE_MAX_CALLS = int(env_get("MT_RATE_LIMIT", "120") or "120")
 _rate_ledger: dict[str, list[float]] = collections.defaultdict(list)
 _last_cleanup_at = 0.0
 _CLEANUP_INTERVAL_SEC = 300
-_USAGE_LOG_EVERY = int(os.getenv("MYTHOSAUR_TOOLS_USAGE_LOG_EVERY", "5"))
-_USAGE_SUMMARY_INTERVAL_SEC = int(os.getenv("MYTHOSAUR_TOOLS_USAGE_LOG_INTERVAL_SEC", "60"))
+_USAGE_LOG_EVERY = int(env_get("MT_USAGE_LOG_EVERY", "5") or "5")
+_USAGE_SUMMARY_INTERVAL_SEC = int(env_get("MT_USAGE_LOG_INTERVAL_SEC", "60") or "60")
 _usage_total_calls = 0
 _usage_tool_counts: collections.Counter[str] = collections.Counter()
 _usage_last_summary_at = 0.0
@@ -111,9 +111,9 @@ def _record_tool_usage(name: str, status: str, duration_ms: int) -> None:
 
 def _require_auth(auth_header: str | None) -> str:
     """Validate bearer token, return the token for rate-limit keying."""
-    expected = (os.getenv("MYTHOSAUR_TOOLS_API_KEY") or "").strip()
+    expected = (env_get("MT_API_KEY", "") or "").strip()
     if not expected:
-        raise HTTPException(status_code=500, detail="MYTHOSAUR_TOOLS_API_KEY is not configured")
+        raise HTTPException(status_code=500, detail="MT_API_KEY is not configured")
     if not auth_header or not auth_header.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="missing bearer token")
     token = auth_header.split(" ", 1)[1].strip()
@@ -217,7 +217,7 @@ def _resolve_consumer_plugin_filter(raw_value: Any) -> set[str] | None:
 
 
 def _default_consumer_name() -> str | None:
-    raw = (os.getenv(DEFAULT_CONSUMER_ENV) or "").strip()
+    raw = (env_get(DEFAULT_CONSUMER_ENV, "") or "").strip()
     if not raw:
         return None
     _resolve_consumer_plugin_filter(raw)
@@ -249,8 +249,8 @@ def _merge_plugin_filters(base: set[str], consumer_filter: set[str] | None) -> s
 
 
 def _build_health_plugins() -> list[JsonDict]:
-    searxng_url = (os.getenv("MYTHOSAUR_TOOLS_SEARXNG_URL") or "").strip()
-    browser_enabled = bool_env("MYTHOSAUR_TOOLS_BROWSER_ENABLED", False)
+    searxng_url = (env_get("MT_SEARXNG_URL", "") or "").strip()
+    browser_enabled = bool_env("MT_BROWSER_ENABLED", False)
 
     plugins: list[JsonDict] = []
     for plugin_meta in PLUGINS_META:
@@ -345,7 +345,7 @@ def _log_tool_call(name: str, tool_result: JsonDict, started_at: float) -> int:
 
 
 def _profile_name() -> str:
-    return (os.getenv("MYTHOSAUR_TOOLS_PROFILE") or READONLY_PROFILE).strip().lower()
+    return (env_get("MT_PROFILE", READONLY_PROFILE) or READONLY_PROFILE).strip().lower()
 
 
 async def _request_context(request: Request) -> McpRequestContext:

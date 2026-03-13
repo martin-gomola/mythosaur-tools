@@ -58,7 +58,7 @@ up: _check-env
 	$(COMPOSE) up -d --build
 
 codex-up: _check-env
-	MYTHOSAUR_TOOLS_DEFAULT_CONSUMER=codex $(COMPOSE) up -d --build
+	MT_DEFAULT_CONSUMER=codex $(COMPOSE) up -d --build
 
 down:
 	$(COMPOSE) down
@@ -106,8 +106,8 @@ codex-smoke:
 # ──────────────────────────────────────────────────
 
 google-login: _check-env
-	@credentials_rel="$$(sed -n 's/^MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE=//p' .env 2>/dev/null | tail -n 1)"; \
-	token_rel="$$(sed -n 's/^MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE=//p' .env 2>/dev/null | tail -n 1)"; \
+	@credentials_rel="$$(sed -n -e 's/^MT_GOOGLE_CREDENTIALS_FILE=//p' -e 's/^MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE=//p' .env 2>/dev/null | tail -n 1)"; \
+	token_rel="$$(sed -n -e 's/^MT_GOOGLE_TOKEN_FILE=//p' -e 's/^MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE=//p' .env 2>/dev/null | tail -n 1)"; \
 	preset="$${PRESET:-workspace}"; \
 	credentials_rel="$${credentials_rel:-/secrets/google-credentials.json}"; \
 	token_rel="$${token_rel:-/secrets/google-token.json}"; \
@@ -138,8 +138,8 @@ google-login: _check-env
 	$(MAKE) --no-print-directory notebooklm-login
 
 google-login-ssh: _check-env
-	@credentials_rel="$$(sed -n 's/^MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE=//p' .env 2>/dev/null | tail -n 1)"; \
-	token_rel="$$(sed -n 's/^MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE=//p' .env 2>/dev/null | tail -n 1)"; \
+	@credentials_rel="$$(sed -n -e 's/^MT_GOOGLE_CREDENTIALS_FILE=//p' -e 's/^MYTHOSAUR_TOOLS_GOOGLE_CREDENTIALS_FILE=//p' .env 2>/dev/null | tail -n 1)"; \
+	token_rel="$$(sed -n -e 's/^MT_GOOGLE_TOKEN_FILE=//p' -e 's/^MYTHOSAUR_TOOLS_GOOGLE_TOKEN_FILE=//p' .env 2>/dev/null | tail -n 1)"; \
 	preset="$${PRESET:-workspace}"; \
 	credentials_rel="$${credentials_rel:-/secrets/google-credentials.json}"; \
 	token_rel="$${token_rel:-/secrets/google-token.json}"; \
@@ -190,7 +190,7 @@ google-login-ssh: _check-env
 	wait $$bg_pid 2>/dev/null; \
 	echo "  Done. Token written to $$token_path"; \
 	echo ""; \
-	notebooklm_enabled="$$(sed -n 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=//p' .env 2>/dev/null | tail -n 1)"; \
+	notebooklm_enabled="$$(sed -n -e 's/^MT_NOTEBOOKLM_ENABLED=//p' -e 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=//p' .env 2>/dev/null | tail -n 1)"; \
 	notebooklm_enabled="$${notebooklm_enabled:-true}"; \
 	case "$$(printf '%s' "$$notebooklm_enabled" | tr '[:upper:]' '[:lower:]')" in \
 		1|true|yes|on) \
@@ -204,9 +204,9 @@ google-login-ssh: _check-env
 	esac
 
 notebooklm-login: _check-env
-	@notebooklm_enabled="$$(sed -n 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=//p' .env 2>/dev/null | tail -n 1)"; \
-	notebooklm_profile="$$(sed -n 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=//p' .env 2>/dev/null | tail -n 1)"; \
-	notebooklm_cli_rel="$$(sed -n 's/^NOTEBOOKLM_MCP_CLI_PATH=//p' .env 2>/dev/null | tail -n 1)"; \
+	@notebooklm_enabled="$$(sed -n -e 's/^MT_NOTEBOOKLM_ENABLED=//p' -e 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=//p' .env 2>/dev/null | tail -n 1)"; \
+	notebooklm_profile="$$(sed -n -e 's/^MT_NOTEBOOKLM_PROFILE=//p' -e 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=//p' .env 2>/dev/null | tail -n 1)"; \
+	notebooklm_cli_rel="$$(sed -n -e 's/^MT_NOTEBOOKLM_MCP_CLI_PATH=//p' -e 's/^NOTEBOOKLM_MCP_CLI_PATH=//p' .env 2>/dev/null | tail -n 1)"; \
 	notebooklm_enabled="$${notebooklm_enabled:-true}"; \
 	notebooklm_profile="$${notebooklm_profile:-default}"; \
 	notebooklm_cli_rel="$${notebooklm_cli_rel:-/secrets/notebooklm}"; \
@@ -224,14 +224,14 @@ notebooklm-login: _check-env
 				$(UV) tool run --from notebooklm-mcp-cli nlm login --profile "$$notebooklm_profile" \
 			;; \
 		*) \
-			echo "Skipping NotebookLM login (MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=$$notebooklm_enabled)."; \
+			echo "Skipping NotebookLM login (MT_NOTEBOOKLM_ENABLED=$$notebooklm_enabled)."; \
 			;; \
 	esac
 
 notebooklm-login-manual: _check-env
-	@notebooklm_enabled="$$(sed -n 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=//p' .env 2>/dev/null | tail -n 1)"; \
-	notebooklm_profile="$$(sed -n 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=//p' .env 2>/dev/null | tail -n 1)"; \
-	notebooklm_cli_rel="$$(sed -n 's/^NOTEBOOKLM_MCP_CLI_PATH=//p' .env 2>/dev/null | tail -n 1)"; \
+	@notebooklm_enabled="$$(sed -n -e 's/^MT_NOTEBOOKLM_ENABLED=//p' -e 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=//p' .env 2>/dev/null | tail -n 1)"; \
+	notebooklm_profile="$$(sed -n -e 's/^MT_NOTEBOOKLM_PROFILE=//p' -e 's/^MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=//p' .env 2>/dev/null | tail -n 1)"; \
+	notebooklm_cli_rel="$$(sed -n -e 's/^MT_NOTEBOOKLM_MCP_CLI_PATH=//p' -e 's/^NOTEBOOKLM_MCP_CLI_PATH=//p' .env 2>/dev/null | tail -n 1)"; \
 	notebooklm_enabled="$${notebooklm_enabled:-true}"; \
 	notebooklm_profile="$${notebooklm_profile:-default}"; \
 	notebooklm_cli_rel="$${notebooklm_cli_rel:-/secrets/notebooklm}"; \
@@ -270,7 +270,7 @@ notebooklm-login-manual: _check-env
 				--manual --file "$$cookies_path" --profile "$$notebooklm_profile" \
 			;; \
 		*) \
-			echo "Skipping NotebookLM login (MYTHOSAUR_TOOLS_NOTEBOOKLM_ENABLED=$$notebooklm_enabled)."; \
+			echo "Skipping NotebookLM login (MT_NOTEBOOKLM_ENABLED=$$notebooklm_enabled)."; \
 			;; \
 	esac
 

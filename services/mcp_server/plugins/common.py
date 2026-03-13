@@ -24,6 +24,15 @@ Handler: TypeAlias = SyncHandler | AsyncHandler
 READONLY_PROFILE: Final = "readonly"
 POWER_PROFILE: Final = "power"
 TRUE_ENV_VALUES: Final = frozenset({"1", "true", "yes", "on"})
+SHORT_ENV_PREFIX: Final = "MT_"
+LEGACY_ENV_PREFIX: Final = "MYTHOSAUR_TOOLS_"
+ENV_ALIASES: Final[dict[str, tuple[str, ...]]] = {
+    "MT_BASE_URL": ("MYTHOSAUR_TOOLS_BASE_URL",),
+    "MT_GOOGLE_MAPS_API_KEY": ("GOOGLE_MAPS_API_KEY",),
+    "MT_GOOGLE_MAPS_PLATFORM": ("GOOGLE_MAPS_PLATFORM",),
+    "MT_LOG_LEVEL": ("LOG_LEVEL",),
+    "MT_NOTEBOOKLM_MCP_CLI_PATH": ("NOTEBOOKLM_MCP_CLI_PATH",),
+}
 
 
 @dataclass
@@ -85,8 +94,31 @@ def parse_int(value: Any, default: int, minimum: int | None = None, maximum: int
     return out
 
 
+def env_names(name: str) -> tuple[str, ...]:
+    names = [name]
+    if name.startswith(SHORT_ENV_PREFIX):
+        names.append(f"{LEGACY_ENV_PREFIX}{name[len(SHORT_ENV_PREFIX):]}")
+    names.extend(ENV_ALIASES.get(name, ()))
+
+    seen: set[str] = set()
+    unique: list[str] = []
+    for item in names:
+        if item and item not in seen:
+            seen.add(item)
+            unique.append(item)
+    return tuple(unique)
+
+
+def env_get(name: str, default: str | None = None) -> str | None:
+    for env_name in env_names(name):
+        value = os.getenv(env_name)
+        if value is not None and value != "":
+            return value
+    return default
+
+
 def workspace_root() -> Path:
-    raw = (os.getenv("MYTHOSAUR_TOOLS_WORKSPACE_ROOT") or "/workspace").strip() or "/workspace"
+    raw = (env_get("MT_WORKSPACE_ROOT", "/workspace") or "/workspace").strip() or "/workspace"
     return Path(raw).resolve()
 
 
@@ -166,7 +198,7 @@ def validate_fetch_url(url: str) -> None:
 
 
 def command_profile() -> str:
-    return (os.getenv("MYTHOSAUR_TOOLS_PROFILE") or READONLY_PROFILE).strip().lower() or READONLY_PROFILE
+    return (env_get("MT_PROFILE", READONLY_PROFILE) or READONLY_PROFILE).strip().lower() or READONLY_PROFILE
 
 
 def is_readonly() -> bool:
@@ -175,7 +207,7 @@ def is_readonly() -> bool:
 
 def bool_env(name: str, default: bool = False) -> bool:
     """Parse a boolean from an environment variable (1, true, yes, on)."""
-    raw = (os.getenv(name) or "").strip().lower()
+    raw = (env_get(name, "") or "").strip().lower()
     if not raw:
         return default
     return raw in TRUE_ENV_VALUES

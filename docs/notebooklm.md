@@ -47,11 +47,15 @@ NOTEBOOKLM_MCP_CLI_PATH="$PWD/secrets/notebooklm" uv tool run --from notebooklm-
 3. Make sure `.env` contains these values:
 
 ```bash
-MYTHOSAUR_TOOLS_NOTEBOOKLM_BIN=nlm
-MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=mythosaur
-MYTHOSAUR_TOOLS_NOTEBOOKLM_TIMEOUT=120
-NOTEBOOKLM_MCP_CLI_PATH=/secrets/notebooklm
+MT_NOTEBOOKLM_BIN=nlm
+MT_NOTEBOOKLM_PROFILE=mythosaur
+MT_NOTEBOOKLM_TIMEOUT=120
+MT_NOTEBOOKLM_MCP_CLI_PATH=/secrets/notebooklm
 ```
+
+When you run the NotebookLM CLI directly on the host, keep using
+`NOTEBOOKLM_MCP_CLI_PATH=...` for that command itself. `MT_NOTEBOOKLM_MCP_CLI_PATH`
+is the repo config key stored in `.env`.
 
 4. Rebuild the service:
 
@@ -64,14 +68,14 @@ docker compose up -d --build
 List the NotebookLM tools exposed by the MCP server:
 
 ```bash
-curl -s http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}/schema | jq '.tools[] | select(.name | startswith("notebooklm_"))'
+curl -s http://127.0.0.1:${MT_MCP_PORT:-8064}/schema | jq '.tools[] | select(.name | startswith("notebooklm_"))'
 ```
 
 Check auth from the MCP side:
 
 ```bash
-API_KEY="$(awk -F= '/^MYTHOSAUR_TOOLS_API_KEY=/{print substr($0,index($0,"=")+1)}' .env | tail -n1)"
-MCP_URL="http://127.0.0.1:${MYTHOSAUR_TOOLS_MCP_PORT:-8064}/mcp"
+API_KEY="$(awk -F= '/^MT_API_KEY=/{print substr($0,index($0,"=")+1)}' .env | tail -n1)"
+MCP_URL="http://127.0.0.1:${MT_MCP_PORT:-8064}/mcp"
 
 curl -sS -X POST "$MCP_URL" \
   -H "Authorization: Bearer $API_KEY" \
@@ -194,6 +198,6 @@ docker compose logs mythosaur-tools
 
 If the login works on the host but not in Docker, verify:
 
-- `NOTEBOOKLM_MCP_CLI_PATH=/secrets/notebooklm` is set in `.env`
-- `MYTHOSAUR_TOOLS_NOTEBOOKLM_PROFILE=mythosaur` is set in `.env`
+- `MT_NOTEBOOKLM_MCP_CLI_PATH=/secrets/notebooklm` is set in `.env`
+- `MT_NOTEBOOKLM_PROFILE=mythosaur` is set in `.env`
 - `./secrets` is mounted into the container

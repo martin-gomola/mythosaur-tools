@@ -1,25 +1,24 @@
 from __future__ import annotations
 
-import os
 from typing import Final
 
 import httpx
 
-from .common import JsonDict, ToolDef, err, now_ms, ok, parse_int
+from .common import JsonDict, ToolDef, env_get, err, now_ms, ok, parse_int
 
 PLUGIN_ID: Final = "mythosaur.search"
 SEARCH_TIMEOUT_SECONDS: Final = 15
 
 
 def _searx_base_url() -> str:
-    base_url = (os.getenv("MYTHOSAUR_TOOLS_SEARXNG_URL") or "").strip().rstrip("/")
+    base_url = (env_get("MT_SEARXNG_URL", "") or "").strip().rstrip("/")
     if not base_url:
-        raise ValueError("MYTHOSAUR_TOOLS_SEARXNG_URL is not configured")
+        raise ValueError("MT_SEARXNG_URL is not configured")
     return base_url
 
 
 def _searx_headers() -> dict[str, str]:
-    token = (os.getenv("MYTHOSAUR_TOOLS_SEARXNG_TOKEN") or "").strip()
+    token = (env_get("MT_SEARXNG_TOKEN", "") or "").strip()
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
