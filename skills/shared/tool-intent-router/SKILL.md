@@ -34,6 +34,9 @@ description: >
 6. If request is ambiguous, ask one short clarification instead of broad tool fan-out.
 7. If the task is to turn evidence into a brief, update, or plan, use `evidence-briefing` after selecting the minimal tool set.
 8. If the task is to sort incoming items by urgency or reply need, use `action-triage` after selecting the minimal tool set.
+9. If the request mentions `shadcn`, `shadcn/ui`, or `ui.shadcn.com`, load `shadcn-ui` and start with the official shadcn skills page before broader web search.
+10. If the request is primarily about UI structure, visual direction, UX quality, landing pages, dashboards, or design-system decisions, load `ui-ux-pro-max` before broader design exploration.
+11. If the request needs real shadcn component execution or registry-aware project work, load `shadcn-mcp` and prefer the official shadcn MCP path.
 
 ## Canonical MCP Map
 
@@ -48,6 +51,13 @@ description: >
   `browser_execute_script`
 - `google` -> see `google-workspace-router` skill for the full Google/NotebookLM tool map
 - `pii` -> `scan_pii_staged`, `scan_pii_repo`, `install_pii_precommit_hook`
+
+## Design-System Rule
+
+- For shadcn/ui work, prefer the official docs at `https://ui.shadcn.com/docs/skills` and related `ui.shadcn.com` pages via `fetch` or `browser`.
+- For project-scoped shadcn component execution, prefer the official MCP guide at `https://ui.shadcn.com/docs/mcp`.
+- Use `search` only if the official docs do not surface the needed page.
+- For broader UI/UX direction, prefer the published `ui-ux-pro-max` skill page at `https://skills.sh/nextlevelbuilder/ui-ux-pro-max-skill/ui-ux-pro-max` before generic design search.
 
 ## Call Format
 

@@ -13,6 +13,9 @@ Current shared skills:
 - `agent-browser`
 - `architect`
 - `code-quality`
+- `shadcn-ui`
+- `shadcn-mcp`
+- `ui-ux-pro-max`
 - `python-patterns`
 - `refactor-cleaner`
 - `tool-intent-router`

@@ -28,6 +28,9 @@ Use the smallest additional shared skill set needed for the task:
 - `google-workspace-router` for Google Workspace or NotebookLM tasks
 - `pii-precommit-check` for staged-file or repo scanning
 - `agent-browser` when browser automation is required
+- `shadcn-ui` when frontend work explicitly targets shadcn/ui
+- `shadcn-mcp` when frontend work needs real shadcn component execution
+- `ui-ux-pro-max` when frontend work needs broader UI/UX direction or review
 
 ## Routing Contract
 

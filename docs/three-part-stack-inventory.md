@@ -36,7 +36,10 @@ This inventory classifies the current `mythosaur-tools` surface using the 3-part
 | `skills/shared/pii-precommit-check` | portable workflow knowledge | `skills/shared/` | Shared commit workflow and blocking behavior built on top of PII execution tools. |
 | `skills/shared/python-patterns` | portable knowledge | `skills/shared/` | Language guidance. |
 | `skills/shared/refactor-cleaner` | portable knowledge | `skills/shared/` | Cleanup/refactor guidance. |
+| `skills/shared/shadcn-ui` | portable workflow knowledge | `skills/shared/` | Shared guidance for official shadcn/ui skills and component-doc retrieval. |
+| `skills/shared/shadcn-mcp` | portable workflow knowledge | `skills/shared/` | Shared guidance for official shadcn MCP execution and project-scoped setup rules. |
 | `skills/shared/tool-intent-router` | portable workflow knowledge | `skills/shared/` | Shared routing heuristics for when to call tools. |
+| `skills/shared/ui-ux-pro-max` | portable workflow knowledge | `skills/shared/` | Shared UI/UX design-system and quality workflow adapted from the published skills.sh guide. |
 
 ## Consumer Adapter Inventory
 
